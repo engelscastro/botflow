@@ -34,7 +34,7 @@ const currentDirname = isESM ? path.dirname(currentFilename) : (typeof __dirname
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || "3000", 10);
 
 app.use(express.json({ limit: '50mb' }));
 
@@ -58,12 +58,27 @@ async function handleAutoResponse(fromNumber: string, userPrompt: string): Promi
 // Health check endpoint
 import { contactsDB, appointmentsDB } from './server/db.js';
 
-app.get("/api/contacts", (req, res) => {
-  res.json(contactsDB.getAll());
+app.get("/api/contacts", async (req, res) => {
+  res.json(await contactsDB.getAll());
 });
 
-app.get("/api/appointments", (req, res) => {
-  res.json(appointmentsDB.getAll());
+app.post("/api/contacts", async (req, res) => {
+  const data = req.body;
+  await contactsDB.upsert({
+     id: `ct-${Date.now()}`,
+     phone: data.phone || 'simulador',
+     name: data.customFields?.nome_data || data.customFields?.nome || data.customFields?.name || data.name || '',
+     cpf: data.customFields?.cpf || '',
+     email: data.customFields?.email || '',
+     customFields: data.customFields || {},
+     createdAt: new Date().toISOString()
+  });
+  res.json({ success: true });
+});
+
+
+app.get("/api/appointments", async (req, res) => {
+  res.json(await appointmentsDB.getAll());
 });
 
 

@@ -62,25 +62,5 @@
       "maternidade": "Santa Mônica"
     },
     "createdAt": "2026-09-16T23:37:56.823Z"
-  },
-  {
-    "id": "ct-1789602721496",
-    "phone": "67362367737946@lid",
-    "name": "Dayana bobs",
-    "cpf": "",
-    "email": "",
-    "customFields": {
-      "phone": "67362367737946@lid",
-      "resposta": "5",
-      "nome": "Dayana bobs",
-      "data_nascimento": "19/09/1989",
-      "rua": "Rua sem calcada",
-      "numero": "Sn",
-      "bairro": "Ouro preto",
-      "ponto_referencia": "Ddd",
-      "data_parto": "888",
-      "maternidade": "Ddd"
-    },
-    "createdAt": "2026-09-16T23:52:01.496Z"
   }
 ]

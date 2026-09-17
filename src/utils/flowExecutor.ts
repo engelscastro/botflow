@@ -186,7 +186,21 @@ export async function executeFlowForContact(
       }
     }
     else if (targetNode.type === 'databaseNode') {
-       // just pass through
+      try {
+        if (data.dbAction === 'save_contact') {
+          await fetch('/api/contacts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: updatedVariables['phone'] || contact.phoneOrHandle || '',
+              name: updatedVariables['nome_data'] || updatedVariables['nome'] || contact.name || '',
+              customFields: updatedVariables
+            })
+          });
+        }
+      } catch (e) {
+        console.error('Failed to save contact from simulator', e);
+      }
     }
     else if (targetNode.type === 'handoverNode') {
       isBotActive = false;

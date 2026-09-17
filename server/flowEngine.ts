@@ -532,7 +532,7 @@ export async function processFlowIncomingMessage(
     else if (type === 'database') {
        const action = currentNode.data?.dbAction;
        if (action === 'save_contact') {
-          contactsDB.upsert({
+          await contactsDB.upsert({
              id: `ct-${Date.now()}`,
              phone: session.variables['phone'],
              name: session.variables['nome_data'] || session.variables['nome'] || session.variables['name'] || '',
@@ -542,7 +542,7 @@ export async function processFlowIncomingMessage(
              createdAt: new Date().toISOString()
           });
        } else if (action === 'query_contact') {
-          const contact = contactsDB.find(c => c.phone === session.variables['phone']);
+          const contact = await contactsDB.find(c => c.phone === session.variables['phone']);
           if (contact) {
              session.variables['is_registered'] = 'true';
              session.variables['nome'] = contact.name || '';

@@ -1,41 +1,72 @@
-import React, { useState } from 'react';
-import { Lock, User, Bot, ShieldCheck, Zap, Users } from 'lucide-react';
-import { UserAccount } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { Lock, User, Bot } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
 interface LoginScreenProps {
-  onLogin: (role: 'admin' | 'enterprise' | 'community') => void;
+  onLogin: (role: 'admin' | 'enterprise' | 'community', userEmail?: string) => void;
   theme: 'dark' | 'light';
-  users?: UserAccount[];
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme, users = [] }) => {
-  const [username, setUsername] = useState('');
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  
   const isDark = theme === 'dark';
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+           onLogin('admin', session.user.email);
+        }
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session) {
+          onLogin('admin', session.user.email);
+        }
+      });
+      return () => subscription.unsubscribe();
+    }
+  }, [onLogin]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = username.toLowerCase().trim();
-    const pwd = password.toLowerCase().trim();
+    setError('');
+    setLoading(true);
     
-    // Default hardcoded logic as fallback, but checking real users first
-    const foundUser = users.find(u => u.username.toLowerCase() === user && pwd === u.username.toLowerCase());
-    
-    if (foundUser) {
-      if (foundUser.status === 'blocked' || foundUser.status === 'inactive') {
-        setError('Sua conta está bloqueada ou inativa. Contate o administrador.');
-        return;
+    if (!supabase) {
+      const user = email.toLowerCase().trim();
+      const pwd = password.toLowerCase().trim();
+      
+      if (user === 'admin' && pwd === 'admin') {
+        onLogin('admin', 'admin@local');
+      } else {
+        setError('Usuário ou senha inválidos. (Modo Local)');
       }
-      onLogin(foundUser.role);
-    } else if (user === 'admin' && pwd === 'admin') {
-      onLogin('admin');
-    } else if (user === 'enterprise' && pwd === 'enterprise') {
-      onLogin('enterprise');
-    } else if ((user === 'community' || user === 'comunidade') && (pwd === 'community' || pwd === 'comunidade')) {
-      onLogin('community');
-    } else {
-      setError('Usuário ou senha inválidos.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Falha na autenticação.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,7 +83,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme, users 
           </div>
           <h1 className="text-2xl font-black tracking-tight font-display">BotFlow Studio</h1>
           <p className={`text-sm mt-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-            Plataforma de Automação IA
+            Autenticação Segura (Supabase)
           </p>
         </div>
 
@@ -62,7 +93,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme, users 
               <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${
                 isDark ? 'text-slate-400' : 'text-slate-500'
               }`}>
-                Usuário
+                E-mail Institucional
               </label>
               <div className="relative">
                 <User className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${
@@ -70,12 +101,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme, users 
                 }`} />
                 <input
                   type="text"
-                  value={username}
+                  value={email}
                   onChange={(e) => {
-                    setUsername(e.target.value);
+                    setEmail(e.target.value);
                     setError('');
                   }}
-                  placeholder="Insira seu usuário..."
+                  placeholder="Seu e-mail cadastrado..."
                   className={`w-full pl-10 pr-4 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500/50 outline-none transition-all ${
                     isDark 
                       ? 'bg-black/50 border-white/10 text-white placeholder-slate-600 focus:border-blue-500' 
@@ -103,7 +134,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme, users 
                     setPassword(e.target.value);
                     setError('');
                   }}
-                  placeholder="Insira sua senha..."
+                  placeholder="Sua senha secreta..."
                   className={`w-full pl-10 pr-4 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500/50 outline-none transition-all ${
                     isDark 
                       ? 'bg-black/50 border-white/10 text-white placeholder-slate-600 focus:border-blue-500' 
@@ -118,34 +149,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme, users 
                 {error}
               </p>
             )}
+            
+            {!supabase && (
+               <p className="text-amber-500 text-xs mt-2 font-medium">
+                ⚠️ Supabase não configurado. Use admin/admin para testar localmente.
+              </p>
+            )}
           </div>
 
           <button
             type="submit"
-            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98]"
+            disabled={loading}
+            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98]"
           >
-            Acessar Plataforma
+            {loading ? 'Autenticando...' : 'Acessar Plataforma'}
           </button>
         </form>
-
-        <div className={`mt-8 pt-6 border-t grid grid-cols-3 gap-2 text-center ${
-          isDark ? 'border-white/5' : 'border-slate-100'
-        }`}>
-          <div className="flex flex-col items-center justify-center gap-1">
-            <ShieldCheck className={`w-4 h-4 ${isDark ? 'text-emerald-500' : 'text-emerald-600'}`} />
-            <span className={`text-[10px] font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Admin</span>
-          </div>
-          <div className="flex flex-col items-center justify-center gap-1">
-            <Zap className={`w-4 h-4 ${isDark ? 'text-purple-500' : 'text-purple-600'}`} />
-            <span className={`text-[10px] font-medium flex gap-1 items-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              Enterprise <span className="bg-purple-500 text-white text-[8px] px-1 rounded-sm">PRO</span>
-            </span>
-          </div>
-          <div className="flex flex-col items-center justify-center gap-1">
-            <Users className={`w-4 h-4 ${isDark ? 'text-blue-500' : 'text-blue-600'}`} />
-            <span className={`text-[10px] font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Community</span>
-          </div>
-        </div>
       </div>
     </div>
   );
