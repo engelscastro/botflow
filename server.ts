@@ -357,41 +357,17 @@ app.post("/api/auth/login", async (req, res) => {
     const allUsers = await usersDB.getAll();
     let user = allUsers.find(u => u.email.toLowerCase().trim() === cleanEmail);
 
-    // Se for o e-mail master do admin e ainda não existir na tabela, cria automaticamente
-    if (!user && (cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com')) {
-      user = {
-        id: `u_admin_${Date.now()}`,
-        name: 'Administrador',
-        email: cleanEmail,
-        password: cleanPwd,
-        role: 'admin',
-        status: 'active',
-        createdAt: new Date().toISOString()
-      };
-      await usersDB.upsert(user);
-    }
-
     if (!user) {
       return res.status(401).json({ error: "Usuário não encontrado. Verifique seu e-mail ou crie uma conta." });
     }
 
     if (user.password && user.password !== cleanPwd) {
-      // Se for o admin master e tentar senhas mestres padrão, aceita e atualiza a senha no banco
-      if ((cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com') && (cleanPwd === 'admin' || cleanPwd === 'admin123')) {
-        user.password = cleanPwd;
-        await usersDB.upsert(user);
-      } else {
-        return res.status(401).json({ error: "Senha incorreta. Se esqueceu, use a opção 'Esqueci minha senha' abaixo." });
-      }
+      return res.status(401).json({ error: "Senha incorreta. Se esqueceu, use a opção 'Esqueci minha senha' abaixo." });
     }
 
     if (user.status === 'blocked') {
       return res.status(403).json({ error: "Sua conta está bloqueada pelo administrador." });
     }
-
-    const effectiveRole = (cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com') 
-      ? 'admin' 
-      : (user.role || 'community');
 
     res.json({
       success: true,
@@ -399,7 +375,7 @@ app.post("/api/auth/login", async (req, res) => {
         id: user.id,
         name: user.name || user.email.split('@')[0],
         email: user.email,
-        role: effectiveRole,
+        role: user.role || 'community',
         status: user.status
       }
     });
@@ -472,19 +448,6 @@ app.post("/api/auth/reset-password", async (req, res) => {
     let user = allUsers.find(u => u.email.toLowerCase().trim() === cleanEmail);
 
     if (!user) {
-      if (cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com') {
-        user = {
-          id: `u_admin_${Date.now()}`,
-          name: 'Administrador',
-          email: cleanEmail,
-          password: cleanPwd,
-          role: 'admin',
-          status: 'active',
-          createdAt: new Date().toISOString()
-        };
-        await usersDB.upsert(user);
-        return res.json({ success: true, message: "Senha redefinida com sucesso! Você já pode entrar." });
-      }
       return res.status(404).json({ error: "Nenhum usuário cadastrado com este e-mail." });
     }
 

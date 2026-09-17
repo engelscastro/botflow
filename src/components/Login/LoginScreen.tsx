@@ -76,13 +76,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
 
         const data = await response.json();
         if (!response.ok) {
-          // Fallback para admin master com senhas padrão
-          const cleanEmail = email.toLowerCase().trim();
-          const cleanPwd = password.trim();
-          if ((cleanEmail === 'admin' || cleanEmail === 'engelsbarros@gmail.com') && (cleanPwd === 'admin' || cleanPwd === 'admin123')) {
-            onLogin('admin', cleanEmail);
-            return;
-          }
           throw new Error(data.error || 'E-mail ou senha inválidos.');
         }
 
@@ -93,13 +86,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
       }
     } catch (err: any) {
       console.error("[Auth Error]", err);
-      const cleanEmail = email.toLowerCase().trim();
-      const cleanPwd = password.trim();
-      if ((cleanEmail === 'admin' || cleanEmail === 'engelsbarros@gmail.com') && (cleanPwd === 'admin' || cleanPwd === 'admin123')) {
-        onLogin('admin', cleanEmail);
-      } else {
-        setError(err.message || 'Falha na autenticação.');
-      }
+      setError(err.message || 'Falha na autenticação.');
     } finally {
       setLoading(false);
     }
