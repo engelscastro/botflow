@@ -253,14 +253,14 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
       <Handle type="target" position={Position.Top} className="w-3 h-3 bg-sky-500/50 border-2 border-sky-400" />
       <div className="bg-sky-500/20 text-sky-300 px-3 py-2 rounded-t-lg border-b border-sky-500/30 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {/* We had an issue with Database icon missing, we can use Users */}
-          <span className="font-bold text-xs uppercase tracking-wider">Ação Interna CRM</span>
+          <Database className="w-4 h-4 text-sky-400" />
+          <span className="font-bold text-xs uppercase tracking-wider">Ação Interna DB</span>
         </div>
       </div>
       <div className="p-3 text-xs text-slate-300">
         <p className="font-bold text-white mb-1">{nodeData.label || 'Salvar / Consultar Cliente'}</p>
         <p className="text-slate-400 text-[11px]">
-          {nodeData.dbAction === 'save_contact' ? 'Salvar perfil do contato' : 'Consultar contato no DB'}
+          {nodeData.dbAction === 'save_contact' ? 'Cadastrar Doador/Cliente' : nodeData.dbAction === 'update_contact' ? 'Atualizar Registro CRM' : 'Consultar contato no DB'}
         </p>
       </div>
       <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-sky-500 border-2 border-slate-900" />

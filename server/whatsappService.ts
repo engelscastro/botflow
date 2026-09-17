@@ -250,7 +250,7 @@ export async function initWhatsAppBaileys(onMessageReceived?: (from: string, tex
 
   try {
     addLog('Iniciando handshake Baileys com os servidores do WhatsApp...');
-    connectionStatus = 'CONNECTING';
+    connectionStatus = 'CONNECTING'; 
 
     if (!fs.existsSync(AUTH_FOLDER)) {
       fs.mkdirSync(AUTH_FOLDER, { recursive: true });
@@ -281,6 +281,7 @@ export async function initWhatsAppBaileys(onMessageReceived?: (from: string, tex
 
     activeSocket.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
+      addLog(`[DEBUG] connection.update: ${JSON.stringify({connection, statusCode: (lastDisconnect?.error as any)?.output?.statusCode})}`);
 
       if (qr) {
         currentQR = qr;
@@ -321,7 +322,7 @@ export async function initWhatsAppBaileys(onMessageReceived?: (from: string, tex
 
         addLog(`Conexão fechada. Código: ${statusCode || 'Desconhecido'}. Encerrado: ${isLoggedOut}`);
 
-        connectionStatus = 'DISCONNECTED';
+        connectionStatus = 'DISCONNECTED'; 
         currentQRDataUrl = null;
 
         if (sock === activeSocket) {
@@ -476,12 +477,12 @@ export async function initWhatsAppBaileys(onMessageReceived?: (from: string, tex
   } catch (error: any) {
     isInitializing = false;
     addLog(`Erro ao iniciar Baileys: ${error?.message || error}`);
-    connectionStatus = 'DISCONNECTED';
+    connectionStatus = 'DISCONNECTED'; 
     sock = null;
   }
 }
 
-export async function disconnectWhatsAppBaileys() {
+export async function disconnectWhatsAppBaileys() { addLog("DISCONNECT CALLED!"); console.trace("DISCONNECT CALLED");
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -500,7 +501,7 @@ export async function disconnectWhatsAppBaileys() {
     }
     sock = null;
   }
-  connectionStatus = 'DISCONNECTED';
+  connectionStatus = 'DISCONNECTED'; 
   currentQRDataUrl = null;
   connectedPhone = null;
   sessionConnectedAt = 0;

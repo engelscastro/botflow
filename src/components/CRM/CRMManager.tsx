@@ -94,6 +94,13 @@ export default function CRMManager({ isDark }: { isDark: boolean }) {
                     <td className="px-6 py-4 text-slate-500">
                       {new Date(contact.createdAt).toLocaleDateString('pt-BR')}
                     </td>
+                    <td className="px-6 py-4">
+                      {Object.keys(contact.customFields || {}).filter(k => k !== 'phone').map(k => (
+                        <div key={k} className="text-xs mb-1">
+                          <span className="font-semibold text-slate-400">{k}:</span> {contact.customFields[k]}
+                        </div>
+                      ))}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <button className="text-blue-500 hover:text-blue-600 font-medium text-xs">
                         Ver Perfil

@@ -385,6 +385,27 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
             </div>
           </div>
         )}
+
+        {/* Database Node Specifics */}
+        {node.type === 'databaseNode' && (
+          <div className={`space-y-3 pt-2 border-t ${isDark ? 'border-white/5' : 'border-slate-200'}`}>
+            <div>
+              <label className={`block font-medium mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Ação no Banco de Dados</label>
+              <select
+                value={data.dbAction || 'save_contact'}
+                onChange={(e) => handleInputChange('dbAction', e.target.value)}
+                className={inputClasses}
+              >
+                <option value="save_contact">Cadastrar Novo Doador/Cliente</option>
+                <option value="query_contact">Consultar Cadastro / Histórico</option>
+                <option value="update_contact">Atualizar Ficha (CRM)</option>
+              </select>
+            </div>
+            <p className={`text-[10px] leading-relaxed mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              * Esta ação se conecta automaticamente ao Banco de Dados da plataforma (PostgreSQL) para registrar ou recuperar dados do usuário atual (Base de Leite, CRM, etc).
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Footer Actions */}

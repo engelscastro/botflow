@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, shell, Notification, Tray, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const automator = require('./automator.cjs');
+
 
 let mainWindow;
 let expressAppStarted = false;
@@ -161,6 +163,8 @@ async function createWindow() {
     }
   });
 
+  automator.setMainWindow(mainWindow);
+
   // Intercept open target="_blank" links to open in external browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http:') || url.startsWith('https:')) {
@@ -241,6 +245,19 @@ ipcMain.on('show-notification', (event, { title, body }) => {
   if (Notification.isSupported()) {
     new Notification({ title: title || 'BotFlow Studio', body: body || '' }).show();
   }
+});
+
+// Automator IPC Handlers
+ipcMain.on('automator-open', () => {
+  automator.createWaWindow();
+});
+
+ipcMain.on('automator-start', (event, { numbers, message, minDelay, maxDelay }) => {
+  automator.startCampaign(numbers, message, minDelay, maxDelay);
+});
+
+ipcMain.on('automator-stop', () => {
+  automator.stopCampaign();
 });
 
 // App lifecycle cleanup

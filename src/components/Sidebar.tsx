@@ -10,7 +10,8 @@ import {
   Bot,
   Send,
   Users,
-  Calendar
+  Calendar,
+  ShieldCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -18,17 +19,19 @@ interface SidebarProps {
   onSelectSection: (section: string) => void;
   unreadCountTotal: number;
   theme?: 'dark' | 'light';
+  userRole?: 'admin' | 'enterprise' | 'community' | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeSection,
   onSelectSection,
   unreadCountTotal,
-  theme = 'dark'
+  theme = 'dark',
+  userRole
 }) => {
   const isDark = theme === 'dark';
 
-  const menuItems = [
+  const allMenuItems = [
     { id: 'builder', label: 'Construtor de Fluxos', icon: Layers, badge: 'Visual' },
     { id: 'inbox', label: 'Inbox Centralizado', icon: MessageSquare, count: unreadCountTotal },
     { id: 'broadcast', label: 'Disparos em Massa', icon: Send, badge: 'CSV' },
@@ -38,7 +41,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'crm', label: 'CRM & Contatos', icon: Users, badge: 'Auto' },
     { id: 'schedule', label: 'Agenda & Reservas', icon: Calendar, badge: 'Auto' },
     { id: 'analytics', label: 'Relatórios & Engajamento', icon: TrendingUp },
+    { id: 'users', label: 'Gestão de Usuários', icon: ShieldCheck, badge: 'Admin' },
   ];
+
+  const communityAllowed = ['builder', 'inbox', 'knowledge', 'channels', 'ai', 'schedule', 'analytics'];
+
+  const menuItems = allMenuItems.filter(item => {
+    if (userRole === 'community') {
+      return communityAllowed.includes(item.id);
+    }
+    if (userRole === 'enterprise' && item.id === 'users') {
+      return false; // Enterprise users cannot manage users
+    }
+    return true; 
+  });
 
   return (
     <aside className={`w-64 border-r flex flex-col justify-between shrink-0 transition-colors ${

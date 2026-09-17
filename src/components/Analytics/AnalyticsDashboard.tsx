@@ -71,41 +71,42 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   };
 
   // Peak activity hours mock data based on live analytics
+  // Hourly Heatmap Fake Data replaced with zeros for starting state
   const hourlyPeakData = useMemo(() => [
-    { hour: '08:00', volume: 140, engagement: '65%' },
-    { hour: '10:00', volume: 480, engagement: '88%' },
-    { hour: '12:00', volume: 390, engagement: '74%' },
-    { hour: '14:00', volume: 620, engagement: '92%' },
-    { hour: '16:00', volume: 550, engagement: '86%' },
-    { hour: '18:00', volume: 710, engagement: '95%' },
-    { hour: '20:00', volume: 420, engagement: '80%' },
-    { hour: '22:00', volume: 180, engagement: '50%' }
+    { hour: '08:00', volume: 0, engagement: '0%' },
+    { hour: '10:00', volume: 0, engagement: '0%' },
+    { hour: '12:00', volume: 0, engagement: '0%' },
+    { hour: '14:00', volume: 0, engagement: '0%' },
+    { hour: '16:00', volume: 0, engagement: '0%' },
+    { hour: '18:00', volume: 0, engagement: '0%' },
+    { hour: '20:00', volume: 0, engagement: '0%' },
+    { hour: '22:00', volume: 0, engagement: '0%' }
   ], []);
 
   // Broadcast & Funnel Conversion metrics
   const broadcastMetrics = useMemo(() => ({
-    totalCampaigns: 14,
-    totalDispatched: 8640,
-    deliveredRate: 98.6,
-    readRate: 91.4,
-    responseRate: 42.8,
-    optOutRate: 0.4,
+    totalCampaigns: 0,
+    totalDispatched: 0,
+    deliveredRate: 0,
+    readRate: 0,
+    responseRate: 0,
+    optOutRate: 0,
     funnelSteps: [
-      { step: '1. Mensagem Enviada', count: 8640, rate: '100%', color: '#3B82F6' },
-      { step: '2. Entregue no Celular', count: 8520, rate: '98.6%', color: '#10B981' },
-      { step: '3. Mensagem Aberta / Lida', count: 7890, rate: '91.4%', color: '#6366F1' },
-      { step: '4. Interação / Resposta', count: 3700, rate: '42.8%', color: '#EC4899' },
-      { step: '5. Conversão / Agendamento', count: 1420, rate: '16.4%', color: '#F59E0B' }
+      { step: '1. Mensagem Enviada', count: 0, rate: '0%', color: '#3B82F6' },
+      { step: '2. Entregue no Celular', count: 0, rate: '0%', color: '#10B981' },
+      { step: '3. Mensagem Aberta / Lida', count: 0, rate: '0%', color: '#6366F1' },
+      { step: '4. Interação / Resposta', count: 0, rate: '0%', color: '#EC4899' },
+      { step: '5. Conversão / Agendamento', count: 0, rate: '0%', color: '#F59E0B' }
     ]
   }), []);
 
   // Top Keywords & User Intents
   const topIntents = useMemo(() => [
-    { keyword: 'Preço / Orçamento', triggers: 1240, share: '32%', trend: '+18%' },
-    { keyword: 'Agendar Horário', triggers: 890, share: '23%', trend: '+24%' },
-    { keyword: 'Falar com Atendente', triggers: 560, share: '14%', trend: '-5%' },
-    { keyword: 'Dúvidas sobre Serviços', triggers: 480, share: '12%', trend: '+8%' },
-    { keyword: 'Localização / Endereço', triggers: 350, share: '9%', trend: '+3%' }
+    { keyword: 'Quero me Cadastrar', triggers: 0, share: '0%', trend: '0%' },
+    { keyword: 'Agendar Coleta', triggers: 0, share: '0%', trend: '0%' },
+    { keyword: 'Dúvidas Gerais', triggers: 0, share: '0%', trend: '0%' },
+    { keyword: 'Falar com Enfermagem', triggers: 0, share: '0%', trend: '0%' },
+    { keyword: 'Outros', triggers: 0, share: '0%', trend: '0%' }
   ], []);
 
   const handleExportCSV = () => {
@@ -410,7 +411,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               </div>
               
               <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <AreaChart data={analytics.messagesByChannel}>
                     <defs>
                       <linearGradient id="waGrad" x1="0" y1="0" x2="0" y2="1">
@@ -461,7 +462,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 </p>
 
                 <div className="h-52">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <PieChart>
                       <Pie
                         data={analytics.resolutionByBotVsHuman}
@@ -539,7 +540,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               </p>
 
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={hourlyPeakData}>
                     <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#262626' : '#f1f5f9'} />
                     <XAxis dataKey="hour" tick={{ fontSize: 11, fill: isDark ? '#9CA3AF' : '#64748B' }} />
@@ -745,11 +746,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
               {[
-                { stars: '5 Estrelas', count: '1.240', pct: '82%', color: '#10B981' },
-                { stars: '4 Estrelas', count: '210', pct: '14%', color: '#3B82F6' },
-                { stars: '3 Estrelas', count: '45', pct: '3%', color: '#F59E0B' },
-                { stars: '2 Estrelas', count: '10', pct: '0.7%', color: '#F97316' },
-                { stars: '1 Estrela', count: '5', pct: '0.3%', color: '#EF4444' }
+                { stars: '5 Estrelas', count: '0', pct: '0%', color: '#10B981' },
+                { stars: '4 Estrelas', count: '0', pct: '0%', color: '#3B82F6' },
+                { stars: '3 Estrelas', count: '0', pct: '0%', color: '#F59E0B' },
+                { stars: '2 Estrelas', count: '0', pct: '0%', color: '#F97316' },
+                { stars: '1 Estrela', count: '0', pct: '0%', color: '#EF4444' }
               ].map((item, i) => (
                 <div key={i} className={`p-4 rounded-xl border text-center space-y-1 ${
                   isDark ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'

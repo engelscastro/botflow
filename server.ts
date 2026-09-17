@@ -24,15 +24,17 @@ import {
   getServerFlows,
   toggleSessionPause
 } from "./server/flowEngine.js";
+import { parseDocumentBuffer } from "./server/documentParser.js";
 
 import { fileURLToPath } from 'url';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const isESM = typeof import.meta !== 'undefined' && import.meta.url;
+const currentFilename = isESM ? fileURLToPath(import.meta.url) : (typeof __filename !== 'undefined' ? __filename : '');
+const currentDirname = isESM ? path.dirname(currentFilename) : (typeof __dirname !== 'undefined' ? __dirname : '');
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = 3000;
 
 app.use(express.json({ limit: '50mb' }));
 
@@ -229,9 +231,11 @@ app.post("/api/ai/generate", async (req, res) => {
 });
 
 // REAL WhatsApp Baileys Endpoints
+app.get("/api/whatsapp/debug", (req, res) => { res.json({ success: true }); });
+app.get("/api/debug/flows", (req, res) => { res.json({ count: 1 }); });
 app.get("/api/whatsapp/status", (req, res) => {
-  const state = getWhatsAppSessionState();
-  res.json(state);
+  const state = getWhatsAppSessionState(); console.log("STATE BEFORE JSON:", JSON.stringify(state));
+  res.json({ ...state});
 });
 
 app.get("/api/whatsapp/messages", (req, res) => {
@@ -276,6 +280,27 @@ app.post("/api/flows", (req, res) => {
   res.json({ success: true, message: "Fluxos e Base de Conhecimento RAG atualizados no servidor." });
 });
 
+app.post("/api/knowledge/parse-document", async (req, res) => {
+  try {
+    const { base64, filename, mimetype } = req.body;
+    if (!base64 || !filename) {
+      return res.status(400).json({ error: "base64 e filename são obrigatórios." });
+    }
+
+    const buffer = Buffer.from(base64, 'base64');
+    const result = await parseDocumentBuffer(buffer, filename, mimetype);
+
+    res.json({
+      success: true,
+      filename,
+      ...result
+    });
+  } catch (err: any) {
+    console.error("Erro ao processar arquivo para RAG:", err);
+    res.status(500).json({ error: err?.message || "Falha ao extrair texto do documento." });
+  }
+});
+
 app.post("/api/whatsapp/toggle-bot", (req, res) => {
   const { phone, isPaused } = req.body;
   if (!phone) return res.status(400).json({ error: "Telefone do contato é obrigatório." });
@@ -292,7 +317,7 @@ export async function startServer(initialPort: number = PORT): Promise<number> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       boundPort = await new Promise<number>((resolve, reject) => {
-        const server = app.listen(currentPort, "127.0.0.1");
+        const server = app.listen(currentPort, "0.0.0.0");
         
         server.once("listening", () => {
           console.log(`[BotFlow Server] Successfully running on http://127.0.0.1:${currentPort}`);
@@ -369,13 +394,13 @@ export async function startServer(initialPort: number = PORT): Promise<number> {
 
       const candidates = [
         process.env.DIST_PATH,
-        __dirname,
-        __dirname.replace("app.asar.unpacked", "app.asar"),
-        __dirname.replace("app.asar", "app.asar.unpacked"),
-        path.join(__dirname, "dist"),
-        path.join(__dirname, "../dist"),
-        path.join(__dirname.replace("app.asar.unpacked", "app.asar"), "dist"),
-        path.join(__dirname.replace("app.asar", "app.asar.unpacked"), "dist"),
+        currentDirname,
+        currentDirname.replace("app.asar.unpacked", "app.asar"),
+        currentDirname.replace("app.asar", "app.asar.unpacked"),
+        path.join(currentDirname, "dist"),
+        path.join(currentDirname, "../dist"),
+        path.join(currentDirname.replace("app.asar.unpacked", "app.asar"), "dist"),
+        path.join(currentDirname.replace("app.asar", "app.asar.unpacked"), "dist"),
         path.join(process.cwd(), "dist"),
         path.join(process.cwd(), "resources/app.asar/dist"),
         path.join(process.cwd(), "resources/app.asar.unpacked/dist"),
@@ -390,7 +415,7 @@ export async function startServer(initialPort: number = PORT): Promise<number> {
         } catch (e) {}
       }
 
-      return __dirname;
+      return currentDirname;
     };
 
     const distPath = resolveDistPath();

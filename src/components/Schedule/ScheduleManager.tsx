@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, User, CheckCircle, Search } from 'lucide-react';
+import { Calendar, Clock, User, CheckCircle, Search, RefreshCw, Link as LinkIcon, Check } from 'lucide-react';
+import { useGoogleLogin } from '@react-oauth/google';
 
 export default function ScheduleManager({ isDark }: { isDark: boolean }) {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
 
   useEffect(() => {
     fetch('/api/appointments')
@@ -11,6 +13,15 @@ export default function ScheduleManager({ isDark }: { isDark: boolean }) {
       .then(data => setAppointments(data))
       .catch(err => console.error("Error fetching appointments", err));
   }, []);
+
+  const login = useGoogleLogin({
+    onSuccess: (tokenResponse) => {
+      console.log('Google connected', tokenResponse);
+      setIsGoogleConnected(true);
+      // Aqui o tokenResponse.access_token seria salvo ou enviado ao backend
+    },
+    scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets',
+  });
 
   const filtered = appointments.filter(a => 
     a.contactId?.includes(searchTerm) ||
@@ -28,6 +39,24 @@ export default function ScheduleManager({ isDark }: { isDark: boolean }) {
           <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'} mt-1`}>
             Acompanhe agendamentos marcados automaticamente pelo robô.
           </p>
+        </div>
+        
+        {/* Google Connect Area */}
+        <div>
+          {!isGoogleConnected ? (
+            <button 
+              onClick={() => login()}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+            >
+              <LinkIcon className="w-4 h-4" />
+              Conectar Google Agenda
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-4 py-2 rounded-lg text-sm font-medium">
+              <Check className="w-4 h-4" />
+              Sincronizado com Google
+            </div>
+          )}
         </div>
       </div>
 

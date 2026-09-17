@@ -78,7 +78,14 @@ export const ChannelsManager: React.FC<ChannelsManagerProps> = ({
           setRealBaileysStatus(data.status);
           setRealBaileysQR(data.qrDataUrl);
           setRealBaileysPhone(data.phoneNumber);
-          if (data.lastLogs) setRealBaileysLogs(data.lastLogs);
+          if (data.lastLogs) {
+            setRealBaileysLogs(prev => {
+              if (prev.length === data.lastLogs.length && prev[prev.length - 1] === data.lastLogs[data.lastLogs.length - 1]) {
+                return prev; // bail out if logs appear unchanged
+              }
+              return data.lastLogs;
+            });
+          }
 
           if (data.status === 'CONNECTED' && !whatsappChannel.connected) {
             if (onSetChannelConnected) {

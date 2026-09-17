@@ -38,6 +38,7 @@ import {
   normalizeAndFormatPhone,
   getDynamicGreeting 
 } from '../../utils/broadcastUtils';
+import { NativeAutomatorPanel } from './NativeAutomatorPanel';
 
 interface BroadcastManagerProps {
   channels: ChannelStatus[];
@@ -955,7 +956,7 @@ export const BroadcastManager: React.FC<BroadcastManagerProps> = ({
                 <input
                   type="range"
                   min={3}
-                  max={30}
+                  max={300}
                   value={minDelay}
                   onChange={(e) => {
                     const val = Number(e.target.value);
@@ -974,7 +975,7 @@ export const BroadcastManager: React.FC<BroadcastManagerProps> = ({
                 <input
                   type="range"
                   min={minDelay}
-                  max={60}
+                  max={300}
                   value={maxDelay}
                   onChange={(e) => setMaxDelay(Number(e.target.value))}
                   className="w-full accent-blue-500 cursor-pointer"
@@ -1410,6 +1411,9 @@ export const BroadcastManager: React.FC<BroadcastManagerProps> = ({
           </div>
         </div>
       )}
+
+      {/* Automação Nativa Fantasma (Electron) */}
+      <NativeAutomatorPanel isDark={isDark} />
     </div>
   );
 };

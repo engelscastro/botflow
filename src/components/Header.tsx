@@ -25,6 +25,8 @@ interface HeaderProps {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onOpenLogs?: () => void;
+  userRole?: 'admin' | 'enterprise' | 'community' | null;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,7 +36,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTestSimulator,
   theme,
   onToggleTheme,
-  onOpenLogs
+  onOpenLogs,
+  userRole,
+  onLogout
 }) => {
   const connectedChannelsCount = channels.filter(c => c.connected).length;
   const isLlama = aiConfig.activeProvider === 'local_llama';
@@ -67,6 +71,15 @@ export const Header: React.FC<HeaderProps> = ({
             }`}>
               <Monitor className="w-3 h-3" /> Electron Desktop
             </span>
+            {userRole && (
+              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                userRole === 'admin' ? 'bg-amber-500/20 text-amber-500 border-amber-500/30 border' :
+                userRole === 'enterprise' ? 'bg-purple-500/20 text-purple-500 border-purple-500/30 border' :
+                'bg-blue-500/20 text-blue-500 border-blue-500/30 border'
+              }`}>
+                {userRole}
+              </span>
+            )}
           </h1>
           <p className={`text-[10px] font-sans ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Gerenciador de Chatbots Visual Drag-and-Drop & Multiplataforma
@@ -154,6 +167,19 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Play className="w-3.5 h-3.5 fill-current" /> Simular Chat ao Vivo
         </button>
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className={`font-bold text-[11px] px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all cursor-pointer ${
+              isDark
+                ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/20'
+                : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-200'
+            }`}
+          >
+            Sair
+          </button>
+        )}
       </div>
 
     </header>

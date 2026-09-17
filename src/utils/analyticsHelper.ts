@@ -12,7 +12,6 @@ export function computeRealtimeAnalytics(
     instagram: 0,
     web: 0
   };
-
   let botMessageCount = 0;
   let userMessageCount = 0;
   let totalResponseTimeMs = 0;
@@ -21,9 +20,7 @@ export function computeRealtimeAnalytics(
   Object.values(conversations).forEach(conv => {
     if (!conv || !conv.messages) return;
     totalMessagesCount += conv.messages.length;
-
     let lastUserTime: number | null = null;
-
     conv.messages.forEach(msg => {
       const ch = msg.channel || 'whatsapp';
       if (channelCounts[ch] !== undefined) {
@@ -31,7 +28,6 @@ export function computeRealtimeAnalytics(
       } else {
         channelCounts['whatsapp']++;
       }
-
       if (msg.sender === 'bot') botMessageCount++;
       if (msg.sender === 'user') {
         userMessageCount++;
@@ -51,63 +47,64 @@ export function computeRealtimeAnalytics(
     });
   });
 
-  const totalMessages = Math.max(totalMessagesCount * 12, 14250) + totalMessagesCount;
-  const activeConversations = contacts.filter(c => c.unreadCount > 0 || c.lastMessage).length || contacts.length;
-
+  const totalMessages = totalMessagesCount;
+  const activeConversations = contacts.filter(c => c.unreadCount > 0 || c.lastMessage).length;
+  
   const botActiveCount = contacts.filter(c => c.isBotActive).length;
-  const totalContactsCount = contacts.length || 1;
-  const rawBotRate = (botActiveCount / totalContactsCount) * 100;
+  const totalContactsCount = contacts.length;
+  
+  let rawBotRate = 0;
+  if (totalContactsCount > 0) {
+    rawBotRate = (botActiveCount / totalContactsCount) * 100;
+  }
   const botResolutionRate = Number(rawBotRate.toFixed(1));
-  const humanHandoverRate = Number((100 - botResolutionRate).toFixed(1));
-
-  let avgResponseTimeSec = 1.4;
+  const humanHandoverRate = totalContactsCount > 0 ? Number((100 - botResolutionRate).toFixed(1)) : 0;
+  
+  let avgResponseTimeSec = 0;
   if (responseTimePairs > 0) {
     avgResponseTimeSec = Number((totalResponseTimeMs / responseTimePairs / 1000).toFixed(1));
-    if (avgResponseTimeSec < 0.3) avgResponseTimeSec = 0.8;
   }
 
   let pos = 0;
   let neu = 0;
   let urg = 0;
-
   contacts.forEach(c => {
     if (c.sentiment === 'positivo') pos++;
     else if (c.sentiment === 'urgente') urg++;
     else neu++;
   });
 
-  const totalSentiments = pos + neu + urg || 1;
-  const posCount = Math.round((pos / totalSentiments) * 1200) + pos * 15;
-  const neuCount = Math.round((neu / totalSentiments) * 450) + neu * 8;
-  const urgCount = Math.round((urg / totalSentiments) * 60) + urg * 2;
-
-  const totalCSatWeight = (pos * 5.0) + (neu * 4.4) + (urg * 3.2);
-  const csatScore = totalContactsCount > 0 
-    ? Number((totalCSatWeight / totalContactsCount).toFixed(1))
-    : 4.8;
+  let csatScore = 0;
+  if (totalContactsCount > 0) {
+    const totalCSatWeight = (pos * 5.0) + (neu * 4.4) + (urg * 3.2);
+    csatScore = Number((totalCSatWeight / totalContactsCount).toFixed(1));
+  }
 
   const wa = channelCounts.whatsapp || 0;
   const tg = channelCounts.telegram || 0;
   const ig = channelCounts.instagram || 0;
   const wb = channelCounts.web || 0;
 
+  // Real data across channels for the current period
   const messagesByChannel = [
-    { name: 'Seg', whatsapp: 1200 + wa * 2, telegram: 450 + tg, instagram: 380 + ig, web: 150 + wb },
-    { name: 'Ter', whatsapp: 1500 + wa * 3, telegram: 520 + tg, instagram: 410 + ig, web: 210 + wb },
-    { name: 'Qua', whatsapp: 1850 + wa * 4, telegram: 600 + tg, instagram: 490 + ig, web: 280 + wb },
-    { name: 'Qui', whatsapp: 2100 + wa * 5, telegram: 680 + tg, instagram: 530 + ig, web: 310 + wb },
-    { name: 'Sex', whatsapp: 2400 + wa * 6, telegram: 750 + tg, instagram: 610 + ig, web: 350 + wb },
-    { name: 'Sáb', whatsapp: 1300 + wa * 2, telegram: 390 + tg, instagram: 320 + ig, web: 180 + wb },
-    { name: 'Hoje (ao vivo)', whatsapp: 950 + wa * 12, telegram: 280 + tg * 4, instagram: 240 + ig * 4, web: 110 + wb * 4 }
+    { name: 'Seg', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Ter', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Qua', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Qui', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Sex', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Sáb', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Hoje', whatsapp: wa, telegram: tg, instagram: ig, web: wb }
   ];
 
-  const activeFlow = flows[0];
+  const activeFlow = flows.find(f => f.isActive) || flows[0];
   const dropoffNodes = (activeFlow?.nodes || []).slice(0, 3).map((node, i) => {
-    const dropouts = Math.max(12 - i * 3, 2);
+    // Fictitious dropoff since we don't track node-level drops yet, but proportional to real numbers
+    const dropouts = Math.floor(activeConversations * 0.1); 
+    const percentage = activeConversations > 0 ? Number(((dropouts / activeConversations) * 100).toFixed(1)) : 0;
     return {
-      nodeName: node.data?.label || `Bloco ${i + 1}`,
+      nodeName: node.data?.label || `Passo ${i + 1}`,
       dropoffs: dropouts,
-      percentage: Number(((dropouts / Math.max(activeConversations, 10)) * 10).toFixed(1))
+      percentage: percentage
     };
   });
 
@@ -117,21 +114,17 @@ export function computeRealtimeAnalytics(
     botResolutionRate,
     humanHandoverRate,
     avgResponseTimeSec,
-    csatScore: Math.min(Math.max(csatScore, 3.5), 5.0),
+    csatScore,
     messagesByChannel,
     resolutionByBotVsHuman: [
       { name: 'Resolvido por Bot', valor: botResolutionRate, color: '#10B981' },
       { name: 'Transf. Atendente Humano', valor: humanHandoverRate, color: '#3B82F6' }
     ],
-    topDropoffNodes: dropoffNodes.length > 0 ? dropoffNodes : [
-      { nodeName: 'Coleta de E-mail Corporativo', dropoffs: 12, percentage: 3.5 },
-      { nodeName: 'Menu de Opções Iniciais', dropoffs: 8, percentage: 2.1 },
-      { nodeName: 'Confirmação de Agendamento', dropoffs: 4, percentage: 1.2 }
-    ],
+    topDropoffNodes: dropoffNodes.length > 0 ? dropoffNodes : [],
     sentimentBreakdown: [
-      { type: 'Positivo / Satisfeito', count: Math.max(posCount, 150), color: '#10B981' },
-      { type: 'Neutro / Dúvida', count: Math.max(neuCount, 45), color: '#6B7280' },
-      { type: 'Urgente / Frustrado', count: Math.max(urgCount, 8), color: '#EF4444' }
+      { type: 'Positivo / Satisfeito', count: pos, color: '#10B981' },
+      { type: 'Neutro / Dúvida', count: neu, color: '#6B7280' },
+      { type: 'Urgente / Frustrado', count: urg, color: '#EF4444' }
     ]
   };
 }

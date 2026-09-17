@@ -122,6 +122,8 @@ export interface Contact {
   variables: Record<string, string>;
   sentiment?: 'positivo' | 'neutro' | 'urgente';
   funnelStage?: 'Novo Lead' | 'Em Atendimento' | 'Proposta Enviada' | 'Convertido' | 'Handover Humano';
+  currentNodeId?: string | null;
+  currentFlowId?: string | null;
 }
 
 export interface Conversation {
@@ -162,6 +164,10 @@ export interface KnowledgeDocument {
   content: string;
   tokens: number;
   updatedAt: string;
+  fileName?: string;
+  fileType?: 'pdf' | 'docx' | 'doc' | 'txt' | 'manual';
+  fileSize?: string;
+  pages?: number;
 }
 
 export interface AnalyticsSummary {
@@ -201,6 +207,15 @@ export interface BroadcastCampaign {
   completedAt?: string;
 }
 
+export interface UserAccount {
+  id: string;
+  username: string;
+  role: 'admin' | 'enterprise' | 'community';
+  status: 'active' | 'inactive' | 'blocked';
+  lastLogin?: string;
+  createdAt?: string;
+}
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -208,6 +223,10 @@ declare global {
       getAppVersion: () => Promise<string>;
       openExternal: (url: string) => void;
       showNotification: (title: string, body: string) => void;
+      openAutomatorWindow: () => void;
+      startAutomatorCampaign: (data: { numbers: string[]; message: string; minDelay: number; maxDelay: number }) => void;
+      stopAutomatorCampaign: () => void;
+      onAutomatorLog: (callback: (data: { msg: string; type: string }) => void) => void;
     };
   }
 }

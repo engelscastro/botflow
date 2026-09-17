@@ -8,10 +8,12 @@ import {
   INITIAL_KNOWLEDGE, 
   INITIAL_ANALYTICS 
 } from './data/initialData';
-import { ChatFlow, Contact, Conversation, Message, ChannelStatus, AIProviderConfig, KnowledgeDocument } from './types';
+import { ChatFlow, Contact, Conversation, Message, ChannelStatus, AIProviderConfig, KnowledgeDocument, UserAccount } from './types';
 
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { LoginScreen } from './components/Login/LoginScreen';
+import { UsersManager } from './components/UsersManager/UsersManager';
 import { FlowCanvas } from './components/FlowBuilder/FlowCanvas';
 import { CentralInbox } from './components/Inbox/CentralInbox';
 import { ChannelsManager } from './components/Channels/ChannelsManager';
@@ -46,6 +48,39 @@ export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('botflow_theme') as 'dark' | 'light') || 'dark';
   });
+
+  const [userRole, setUserRole] = useState<'admin' | 'enterprise' | 'community' | null>(() => {
+    return (localStorage.getItem('botflow_role') as 'admin' | 'enterprise' | 'community' | null) || null;
+  });
+
+  const [systemUsers, setSystemUsers] = useState<UserAccount[]>(() => {
+    const saved = localStorage.getItem('botflow_users');
+    if (saved) return JSON.parse(saved);
+    return [
+      { id: '1', username: 'admin', role: 'admin', status: 'active', createdAt: new Date().toLocaleDateString() },
+      { id: '2', username: 'enterprise', role: 'enterprise', status: 'active', createdAt: new Date().toLocaleDateString() },
+      { id: '3', username: 'community', role: 'community', status: 'active', createdAt: new Date().toLocaleDateString() }
+    ];
+  });
+
+  const handleUpdateUserStatus = (userId: string, status: 'active' | 'inactive' | 'blocked') => {
+    setSystemUsers(prev => {
+      const newUsers = prev.map(u => u.id === userId ? { ...u, status } : u);
+      localStorage.setItem('botflow_users', JSON.stringify(newUsers));
+      return newUsers;
+    });
+  };
+
+  const handleLogin = (role: 'admin' | 'enterprise' | 'community') => {
+    setUserRole(role);
+    localStorage.setItem('botflow_role', role);
+    if (role === 'community') {
+      const allowed = ['builder', 'inbox', 'knowledge', 'channels', 'ai', 'schedule', 'analytics'];
+      if (!allowed.includes(activeSection)) {
+        setActiveSection('builder');
+      }
+    }
+  };
 
   const handleToggleTheme = () => {
     setTheme(prev => {
@@ -351,6 +386,25 @@ export default function App() {
 
     const result = await executeFlowForContact(targetFlow, targetContact, userText, documents);
 
+    // Always update contact details
+    setContacts(prev => prev.map(c => {
+      if (c.id === contactId) {
+        return {
+          ...c,
+          tags: Array.from(new Set([...(c.tags || []), ...result.updatedTags])),
+          variables: { ...(c.variables || {}), ...result.updatedVariables },
+          isBotActive: result.isBotActive,
+          funnelStage: result.funnelStage || c.funnelStage,
+          currentNodeId: result.currentNodeId !== undefined ? result.currentNodeId : c.currentNodeId,
+          ...(result.botMessages.length > 0 ? {
+            lastMessage: result.botMessages[result.botMessages.length - 1].text,
+            lastMessageTime: result.botMessages[result.botMessages.length - 1].timestamp,
+          } : {})
+        };
+      }
+      return c;
+    }));
+
     if (result.botMessages.length > 0) {
       // 1. Update conversations
       setConversations(prev => {
@@ -363,23 +417,6 @@ export default function App() {
           }
         };
       });
-
-      // 2. Update contact details
-      const lastBotMsg = result.botMessages[result.botMessages.length - 1];
-      setContacts(prev => prev.map(c => {
-        if (c.id === contactId) {
-          return {
-            ...c,
-            lastMessage: lastBotMsg.text,
-            lastMessageTime: lastBotMsg.timestamp,
-            tags: Array.from(new Set([...(c.tags || []), ...result.updatedTags])),
-            variables: { ...(c.variables || {}), ...result.updatedVariables },
-            isBotActive: result.isBotActive,
-            funnelStage: result.funnelStage || c.funnelStage
-          };
-        }
-        return c;
-      }));
 
       // 3. Send real WhatsApp message if applicable
       if (targetContact.channel === 'whatsapp' && targetContact.phoneOrHandle) {
@@ -436,6 +473,10 @@ export default function App() {
     setDocuments(prev => prev.filter(d => d.id !== id));
   };
 
+  if (!userRole) {
+    return <LoginScreen onLogin={handleLogin} theme={theme} users={systemUsers} />;
+  }
+
   return (
     <div className={`flex flex-col h-screen w-screen overflow-hidden font-sans antialiased transition-colors ${
       theme === 'dark' ? 'bg-[#050505] text-slate-300' : 'bg-slate-100 text-slate-800'
@@ -449,6 +490,11 @@ export default function App() {
         theme={theme}
         onToggleTheme={handleToggleTheme}
         onOpenLogs={() => setIsLogsOpen(true)}
+        userRole={userRole}
+        onLogout={() => {
+          setUserRole(null);
+          localStorage.removeItem('botflow_role');
+        }}
       />
 
       {/* Main Body Layout */}
@@ -459,6 +505,7 @@ export default function App() {
           onSelectSection={setActiveSection}
           unreadCountTotal={unreadCountTotal}
           theme={theme}
+          userRole={userRole}
         />
 
         {/* Dynamic Section Content with persistent mounting to avoid losing active campaign or flow states */}
@@ -535,6 +582,14 @@ export default function App() {
             <AnalyticsDashboard
               analytics={analytics}
               theme={theme}
+            />
+          </div>
+
+          <div className={activeSection === 'users' ? 'flex-1 flex flex-col h-full overflow-y-auto' : 'hidden'}>
+            <UsersManager
+              isDark={theme === 'dark'}
+              users={systemUsers}
+              onUpdateStatus={handleUpdateUserStatus}
             />
           </div>
         </main>

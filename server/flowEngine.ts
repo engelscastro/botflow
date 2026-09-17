@@ -535,7 +535,7 @@ export async function processFlowIncomingMessage(
           contactsDB.upsert({
              id: `ct-${Date.now()}`,
              phone: session.variables['phone'],
-             name: session.variables['nome'] || session.variables['name'] || '',
+             name: session.variables['nome_data'] || session.variables['nome'] || session.variables['name'] || '',
              cpf: session.variables['cpf'] || '',
              email: session.variables['email'] || '',
              customFields: session.variables,

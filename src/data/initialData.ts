@@ -2,6 +2,222 @@ import { ChatFlow, Contact, Conversation, ChannelStatus, AIProviderConfig, Knowl
 
 export const INITIAL_FLOWS: ChatFlow[] = [
   {
+    id: 'flow-bancodeleite-01',
+    name: 'Banco de Leite - Maternidade Santa Mônica',
+    description: 'Fluxo para captação de novas doadoras e agendamento de coleta de leite materno (MESM).',
+    channel: 'whatsapp',
+    isActive: true,
+    updatedAt: 'Agora',
+    triggerCount: 0,
+    nodes: [
+      {
+        id: 'bl-trigger',
+        type: 'triggerNode',
+        position: { x: 50, y: 300 },
+        data: {
+          label: 'Início: Banco de Leite',
+          type: 'trigger',
+          channel: 'whatsapp',
+          triggerType: 'first_message',
+        }
+      },
+      {
+        id: 'bl-menu',
+        type: 'messageNode',
+        position: { x: 350, y: 300 },
+        data: {
+          label: 'Menu Principal MESM',
+          type: 'message',
+          messageText: 'Olá! Sou a assistente virtual do Banco de Leite Materno da Maternidade Escola Santa Mônica (MESM) 🍼. Como posso ajudar hoje?',
+          quickReplies: ['1. Quero me Cadastrar', '2. Agendar Coleta / Vidros'],
+        }
+      },
+      // CADASTRO BRANCH
+      {
+        id: 'bl-cad-1',
+        type: 'questionNode',
+        position: { x: 700, y: 150 },
+        data: {
+          label: 'Cadastro - Nome',
+          type: 'question',
+          messageText: 'Ficamos felizes com seu interesse! Cada gota salva vidas 💕. Para iniciar seu pré-cadastro, qual é o seu Nome Completo?',
+          variableName: 'nome',
+        }
+      },
+      {
+        id: 'bl-cad-1b',
+        type: 'questionNode',
+        position: { x: 1000, y: 150 },
+        data: {
+          label: 'Cadastro - Nascimento',
+          type: 'question',
+          messageText: 'Ótimo! Qual a sua Data de Nascimento? (Ex: 10/05/1990)',
+          variableName: 'data_nascimento',
+        }
+      },
+      {
+        id: 'bl-cad-2a',
+        type: 'questionNode',
+        position: { x: 1300, y: 150 },
+        data: {
+          label: 'Cadastro - Rua',
+          type: 'question',
+          messageText: 'Perfeito! Agora sobre o seu endereço. Qual o nome da sua Rua/Avenida?',
+          variableName: 'rua',
+        }
+      },
+      {
+        id: 'bl-cad-2b',
+        type: 'questionNode',
+        position: { x: 1600, y: 150 },
+        data: {
+          label: 'Cadastro - Número',
+          type: 'question',
+          messageText: 'Qual o Número da residência?',
+          variableName: 'numero',
+        }
+      },
+      {
+        id: 'bl-cad-2c',
+        type: 'questionNode',
+        position: { x: 1900, y: 150 },
+        data: {
+          label: 'Cadastro - Bairro',
+          type: 'question',
+          messageText: 'Qual o Bairro?',
+          variableName: 'bairro',
+        }
+      },
+      {
+        id: 'bl-cad-2d',
+        type: 'questionNode',
+        position: { x: 2200, y: 150 },
+        data: {
+          label: 'Cadastro - Referência',
+          type: 'question',
+          messageText: 'Qual o Ponto de Referência do seu endereço?',
+          variableName: 'ponto_referencia',
+        }
+      },
+      {
+        id: 'bl-cad-3a',
+        type: 'questionNode',
+        position: { x: 2500, y: 150 },
+        data: {
+          label: 'Cadastro - Data Parto',
+          type: 'question',
+          messageText: 'Falta pouco! Qual foi a Data do seu Parto?',
+          variableName: 'data_parto',
+        }
+      },
+      {
+        id: 'bl-cad-3b',
+        type: 'questionNode',
+        position: { x: 2800, y: 150 },
+        data: {
+          label: 'Cadastro - Maternidade',
+          type: 'question',
+          messageText: 'Em qual Maternidade ou Hospital o bebê nasceu?',
+          variableName: 'maternidade',
+        }
+      },
+      {
+        id: 'bl-cad-confirm',
+        type: 'messageNode',
+        position: { x: 3100, y: 150 },
+        data: {
+          label: 'Cadastro - Confirmação',
+          type: 'message',
+          messageText: 'Aqui estão os seus dados:\n\n*Nome:* {{nome}}\n*Nascimento:* {{data_nascimento}}\n*Rua:* {{rua}}, {{numero}}\n*Bairro:* {{bairro}}\n*Referência:* {{ponto_referencia}}\n*Data do Parto:* {{data_parto}}\n*Maternidade:* {{maternidade}}\n\nPodemos confirmar o seu pré-cadastro?',
+          quickReplies: ['1. Confirmar', '2. Refazer Cadastro'],
+        }
+      },
+      {
+        id: 'bl-cad-db',
+        type: 'databaseNode',
+        position: { x: 3400, y: 150 },
+        data: {
+          label: 'Cadastrar Doadora (DB)',
+          type: 'database',
+          dbAction: 'save_contact',
+        }
+      },
+      {
+        id: 'bl-cad-4',
+        type: 'messageNode',
+        position: { x: 3700, y: 150 },
+        data: {
+          label: 'Cadastro - Fim',
+          type: 'message',
+          messageText: 'Seu pré-cadastro foi recebido! 📋 Nossa equipe de enfermagem entrará em contato para checar seus exames (Hemograma, VDRL, HIV, Hepatite) e aprovar sua doação. Muito obrigada!',
+        }
+      },
+      // COLETA BRANCH
+      {
+        id: 'bl-col-1',
+        type: 'messageNode',
+        position: { x: 700, y: 450 },
+        data: {
+          label: 'Coleta - Motivo',
+          type: 'message',
+          messageText: 'Agendamento 🚐. Qual o motivo do atendimento hoje?',
+          quickReplies: ['Buscar Leite Congelado', 'Receber Vidros Vazios', 'Devolver Vidros'],
+        }
+      },
+      {
+        id: 'bl-col-2',
+        type: 'questionNode',
+        position: { x: 1050, y: 450 },
+        data: {
+          label: 'Coleta - Quantidade',
+          type: 'question',
+          messageText: 'Certo! Qual a quantidade de potes (vidros) para essa coleta/entrega?',
+        }
+      },
+      {
+        id: 'bl-col-db',
+        type: 'databaseNode',
+        position: { x: 1400, y: 450 },
+        data: {
+          label: 'Registrar Coleta (DB)',
+          type: 'database',
+          dbAction: 'update_contact',
+        }
+      },
+      {
+        id: 'bl-col-3',
+        type: 'messageNode',
+        position: { x: 1750, y: 450 },
+        data: {
+          label: 'Coleta - Fim',
+          type: 'message',
+          messageText: 'Tudo anotado! ✅ A equipe da rota do Banco de Leite passará no seu endereço conforme nosso cronograma. Agradecemos sua doação!',
+        }
+      }
+    ],
+    edges: [
+      { id: 'bl-e-1', source: 'bl-trigger', target: 'bl-menu' },
+      { id: 'bl-e-2', source: 'bl-menu', target: 'bl-cad-1', label: 'Cadastro' },
+      { id: 'bl-e-3', source: 'bl-cad-1', target: 'bl-cad-1b' },
+      { id: 'bl-e-1b', source: 'bl-cad-1b', target: 'bl-cad-2a' },
+      { id: 'bl-e-2a', source: 'bl-cad-2a', target: 'bl-cad-2b' },
+      { id: 'bl-e-2b', source: 'bl-cad-2b', target: 'bl-cad-2c' },
+      { id: 'bl-e-2c', source: 'bl-cad-2c', target: 'bl-cad-2d' },
+      { id: 'bl-e-2d', source: 'bl-cad-2d', target: 'bl-cad-3a' },
+      { id: 'bl-e-3a', source: 'bl-cad-3a', target: 'bl-cad-3b' },
+      { id: 'bl-e-conf', source: 'bl-cad-3b', target: 'bl-cad-confirm' },
+      { id: 'bl-e-db1', source: 'bl-cad-confirm', target: 'bl-cad-db', label: '1. Confirmar' },
+      { id: 'bl-e-redo', source: 'bl-cad-confirm', target: 'bl-cad-1', label: '2. Refazer Cadastro' },
+      { id: 'bl-e-5', source: 'bl-cad-db', target: 'bl-cad-4' },
+      { id: 'bl-e-6', source: 'bl-menu', target: 'bl-col-1', label: 'Coleta' },
+      { id: 'bl-e-7a', source: 'bl-col-1', target: 'bl-col-2', label: 'Buscar Leite' },
+      { id: 'bl-e-7b', source: 'bl-col-1', target: 'bl-col-2', label: 'Receber Vidros' },
+      { id: 'bl-e-7c', source: 'bl-col-1', target: 'bl-col-2', label: 'Devolver Vidros' },
+      { id: 'bl-e-db2', source: 'bl-col-2', target: 'bl-col-db' },
+      { id: 'bl-e-8', source: 'bl-col-db', target: 'bl-col-3' }
+    ]
+  },
+  {
     id: 'flow-sagi-01',
     name: 'Superintendência de Avaliação e Gestão da Informação (SAGI)',
     description: 'Fluxo oficial de atendimento institucional com direcionamento para Vigilância Socioassistencial e Gestão do Trabalho e Educação Permanente.',
@@ -462,7 +678,8 @@ export const INITIAL_KNOWLEDGE: KnowledgeDocument[] = [
     category: 'SAGI & Gestão',
     content: 'A SAGI tem a missão institucional de gerir, analisar e avaliar as informações socioassistenciais do Estado de Alagoas, articulando a Gerência de Vigilância Socioassistencial e a Gerência de Gestão do Trabalho e Educação Permanente para apoiar os 102 municípios alagoanos no fortalecimento do SUAS.',
     tokens: 160,
-    updatedAt: 'Hoje'
+    updatedAt: 'Hoje',
+    fileType: 'manual'
   },
   {
     id: 'doc-sagi-02',
@@ -470,7 +687,8 @@ export const INITIAL_KNOWLEDGE: KnowledgeDocument[] = [
     category: 'Vigilância Socioassistencial',
     content: 'A Vigilância Socioassistencial atua na produção de diagnósticos socioterritoriais, monitoramento do CadÚnico, preenchimento do Censo SUAS, tabulação do RMA (Registro Mensal de Atendimento) e gestão do SISC. O setor apoia municípios na criação de seus setores próprios de vigilância e no uso de evidências para o planejamento.',
     tokens: 180,
-    updatedAt: 'Hoje'
+    updatedAt: 'Hoje',
+    fileType: 'manual'
   },
   {
     id: 'doc-sagi-03',
@@ -478,7 +696,8 @@ export const INITIAL_KNOWLEDGE: KnowledgeDocument[] = [
     category: 'Observatório & Dados',
     content: 'Plataforma oficial de BI e transparência socioterritorial de Alagoas, integrando painéis interativos de vulnerabilidade, cobertura de CRAS/CREAS, programas de transferência de renda e indicadores municipais.',
     tokens: 130,
-    updatedAt: 'Hoje'
+    updatedAt: 'Hoje',
+    fileType: 'manual'
   },
   {
     id: 'doc-sagi-04',
@@ -486,7 +705,8 @@ export const INITIAL_KNOWLEDGE: KnowledgeDocument[] = [
     category: 'Educação Permanente',
     content: 'Responsável pelo apoio técnico na adequação à NOB-RH/SUAS, estruturação de planos de cargos e carreiras, suporte ao CadSUAS e execução de capacitações como CapacitaSUAS, oficinas regionais e cursos de aperfeiçoamento para trabalhadores do SUAS.',
     tokens: 170,
-    updatedAt: 'Hoje'
+    updatedAt: 'Hoje',
+    fileType: 'manual'
   },
   {
     id: 'doc-01',
@@ -515,33 +735,29 @@ export const INITIAL_KNOWLEDGE: KnowledgeDocument[] = [
 ];
 
 export const INITIAL_ANALYTICS: AnalyticsSummary = {
-  totalMessages: 18450,
-  activeConversations: 342,
-  botResolutionRate: 86.4,
-  humanHandoverRate: 13.6,
-  avgResponseTimeSec: 1.4,
-  csatScore: 4.9,
+  totalMessages: 0,
+  activeConversations: 0,
+  botResolutionRate: 0,
+  humanHandoverRate: 0,
+  avgResponseTimeSec: 0,
+  csatScore: 0,
   messagesByChannel: [
-    { name: 'Seg', whatsapp: 1200, telegram: 450, instagram: 380, web: 150 },
-    { name: 'Ter', whatsapp: 1500, telegram: 520, instagram: 410, web: 210 },
-    { name: 'Qua', whatsapp: 1850, telegram: 600, instagram: 490, web: 280 },
-    { name: 'Qui', whatsapp: 2100, telegram: 680, instagram: 530, web: 310 },
-    { name: 'Sex', whatsapp: 2400, telegram: 750, instagram: 610, web: 350 },
-    { name: 'Sáb', whatsapp: 1300, telegram: 390, instagram: 320, web: 180 },
-    { name: 'Dom', whatsapp: 950, telegram: 280, instagram: 240, web: 110 }
+    { name: 'Seg', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Ter', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Qua', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Qui', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Sex', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Sáb', whatsapp: 0, telegram: 0, instagram: 0, web: 0 },
+    { name: 'Dom', whatsapp: 0, telegram: 0, instagram: 0, web: 0 }
   ],
   resolutionByBotVsHuman: [
-    { name: 'Resolvido por Bot', valor: 86.4, color: '#10B981' },
-    { name: 'Transf. Atendente Humano', valor: 13.6, color: '#3B82F6' }
+    { name: 'Resolvido por Bot', valor: 0, color: '#10B981' },
+    { name: 'Transf. Atendente Humano', valor: 0, color: '#3B82F6' }
   ],
-  topDropoffNodes: [
-    { nodeName: 'Coleta de E-mail Corporativo', dropoffs: 42, percentage: 4.1 },
-    { nodeName: 'Menu de Opções Iniciais', dropoffs: 28, percentage: 2.7 },
-    { nodeName: 'Confirmação de Agendamento', dropoffs: 18, percentage: 1.8 }
-  ],
+  topDropoffNodes: [],
   sentimentBreakdown: [
-    { type: 'Positivo / Satisfeito', count: 1240, color: '#10B981' },
-    { type: 'Neutro / Dúvida', count: 480, color: '#6B7280' },
-    { type: 'Urgente / Frustrado', count: 65, color: '#EF4444' }
+    { type: 'Positivo / Satisfeito', count: 0, color: '#10B981' },
+    { type: 'Neutro / Dúvida', count: 0, color: '#6B7280' },
+    { type: 'Urgente / Frustrado', count: 0, color: '#EF4444' }
   ]
 };
