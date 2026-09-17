@@ -1,0 +1,6 @@
+{
+  "name": "BotFlow Studio",
+  "description": "Sistema de gerenciamento e automação de chatbots visual drag-and-drop com suporte para WhatsApp Web, Telegram, Instagram, IA Local (Llama/Gemini), inbox centralizado e relatórios detalhados.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

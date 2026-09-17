@@ -1,0 +1,692 @@
+import express from "express";
+import path from "path";
+import fs from "fs";
+import { exec } from "child_process";
+import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
+import {
+  getLogDirectory,
+  getAppLogFilePath,
+  getErrorLogFilePath,
+  readAppLogs,
+  clearAppLogs
+} from "./server/logger.js";
+import {
+  initWhatsAppBaileys,
+  getWhatsAppSessionState,
+  disconnectWhatsAppBaileys,
+  sendWhatsAppMessage,
+  getWhatsAppMessages
+} from "./server/whatsappService.js";
+import {
+  processFlowIncomingMessage,
+  setServerFlows,
+  getServerFlows,
+  toggleSessionPause
+} from "./server/flowEngine.js";
+import { parseDocumentBuffer } from "./server/documentParser.js";
+
+import { fileURLToPath } from 'url';
+const isESM = typeof import.meta !== 'undefined' && import.meta.url;
+const currentFilename = isESM ? fileURLToPath(import.meta.url) : (typeof __filename !== 'undefined' ? __filename : '');
+const currentDirname = isESM ? path.dirname(currentFilename) : (typeof __dirname !== 'undefined' ? __dirname : '');
+
+dotenv.config();
+
+const app = express();
+const PORT = parseInt(process.env.PORT || "3000", 10);
+
+app.use(express.json({ limit: '50mb' }));
+
+// Initialize Gemini client lazily
+let aiClient: GoogleGenAI | null = null;
+function getAIClient() {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      aiClient = new GoogleGenAI({ apiKey });
+    }
+  }
+  return aiClient;
+}
+
+// Automatic message responder handler for real WhatsApp messages executing active flows
+async function handleAutoResponse(fromNumber: string, userPrompt: string): Promise<string | null> {
+  return await processFlowIncomingMessage(fromNumber, userPrompt, getAIClient);
+}
+
+// Health check endpoint
+import { contactsDB, appointmentsDB, usersDB, DBUser } from './server/db.js';
+
+app.get("/api/contacts", async (req, res) => {
+  res.json(await contactsDB.getAll());
+});
+
+app.post("/api/contacts", async (req, res) => {
+  const data = req.body;
+  await contactsDB.upsert({
+     id: `ct-${Date.now()}`,
+     phone: data.phone || 'simulador',
+     name: data.customFields?.nome_data || data.customFields?.nome || data.customFields?.name || data.name || '',
+     cpf: data.customFields?.cpf || '',
+     email: data.customFields?.email || '',
+     customFields: data.customFields || {},
+     createdAt: new Date().toISOString()
+  });
+  res.json({ success: true });
+});
+
+
+app.get("/api/appointments", async (req, res) => {
+  res.json(await appointmentsDB.getAll());
+});
+
+
+// ==========================================
+// WHATSAPP CLOUD API (META) WEBHOOKS
+// ==========================================
+let metaWaConfig = {
+  verifyToken: 'botflow_secure_123',
+  apiToken: '',
+  phoneNumberId: ''
+};
+
+app.post('/api/wa-config', (req, res) => {
+  metaWaConfig = { ...metaWaConfig, ...req.body };
+  res.json({ success: true, config: metaWaConfig });
+});
+
+// Verificação do Webhook (Meta)
+app.get('/api/webhook/whatsapp', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode && token) {
+    if (mode === 'subscribe' && token === metaWaConfig.verifyToken) {
+      console.log('WEBHOOK_VERIFIED');
+      res.status(200).send(challenge);
+    } else {
+      res.sendStatus(403);
+    }
+  } else {
+    res.sendStatus(400);
+  }
+});
+
+// Recebimento de mensagens (Meta)
+app.post('/api/webhook/whatsapp', async (req, res) => {
+  const body = req.body;
+  
+  if (body.object) {
+    if (body.entry && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0]) {
+      const waMessage = body.entry[0].changes[0].value.messages[0];
+      const from = waMessage.from;
+      const text = waMessage.text ? waMessage.text.body : '';
+      
+      console.log(`[Meta API] Mensagem de ${from}: ${text}`);
+      
+      // Processa pelo BotFlow
+      const aiClient = null; // Instanciar AI se necessário
+      const reply = await processFlowIncomingMessage(from, text, () => aiClient);
+      
+      if (reply) {
+         // Responde via Meta API
+         if (metaWaConfig.apiToken && metaWaConfig.phoneNumberId) {
+            try {
+              await fetch(`https://graph.facebook.com/v19.0/${metaWaConfig.phoneNumberId}/messages`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${metaWaConfig.apiToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  messaging_product: 'whatsapp',
+                  to: from,
+                  type: 'text',
+                  text: { body: reply }
+                })
+              });
+            } catch (err) {
+              console.error("Erro ao responder Meta API", err);
+            }
+         }
+      }
+    }
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(404);
+  }
+});
+
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// System Logs endpoints
+app.get("/api/logs", (req, res) => {
+  const data = readAppLogs();
+  res.json({
+    success: true,
+    logsPath: data.path,
+    errorLogsPath: data.errorPath,
+    logDir: getLogDirectory(),
+    content: data.content
+  });
+});
+
+app.post("/api/logs/open-folder", (req, res) => {
+  const dir = getLogDirectory();
+  try {
+    const cmd = process.platform === 'win32' 
+      ? `start "" "${dir}"`
+      : process.platform === 'darwin'
+      ? `open "${dir}"`
+      : `xdg-open "${dir}"`;
+    
+    exec(cmd, (err) => {
+      if (err) {
+        console.error('[Logs API] Error opening folder:', err);
+        return res.status(500).json({ success: false, message: err.message });
+      }
+      res.json({ success: true, message: 'Pasta de logs aberta no sistema.' });
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err?.message || String(err) });
+  }
+});
+
+app.delete("/api/logs", (req, res) => {
+  const success = clearAppLogs();
+  res.json({ success, message: success ? 'Logs limpos com sucesso.' : 'Falha ao limpar logs.' });
+});
+
+// AI Generation Proxy (Supports Local Llama simulation or Gemini)
+app.post("/api/ai/generate", async (req, res) => {
+  try {
+    const { prompt, systemPrompt, model, provider, knowledgeContext } = req.body;
+    const ai = getAIClient();
+    
+    let fullPrompt = `System: ${systemPrompt || 'Você é um assistente virtual atencioso.'}\n`;
+    if (knowledgeContext) {
+      fullPrompt += `Contexto da Base de Conhecimento:\n${knowledgeContext}\n\n`;
+    }
+    fullPrompt += `Usuário: ${prompt}\nResposta:`;
+
+    if (ai) {
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: fullPrompt,
+        });
+        const text = response.text || "Desculpe, não consegui processar sua resposta no momento.";
+        return res.json({ text, provider: provider || 'gemini', model: 'gemini-2.5-flash' });
+      } catch (err: any) {
+        console.error("Gemini API Error, falling back to Llama simulation:", err?.message);
+      }
+    }
+
+    let responseText = `🤖 [Llama 3.2 Local]: Olá! `;
+    const lowerPrompt = (prompt || '').toLowerCase();
+
+    if (lowerPrompt.includes('preço') || lowerPrompt.includes('plano') || lowerPrompt.includes('quanto custa')) {
+      responseText += `Nossos planos de automação começam em R$ 149/mês para até 3 canais com IA Llama inclusa.`;
+    } else if (lowerPrompt.includes('whatsapp') || lowerPrompt.includes('qr')) {
+      responseText += `Para conectar o WhatsApp Web real, acesse a aba 'Conexões & Canais', escaneie o QR Code emitido pelo servidor Baileys em tempo real.`;
+    } else {
+      responseText += `Entendi sua pergunta sobre "${prompt}". O bot automatizado respondeu usando a IA configurada.`;
+    }
+
+    return res.json({ text: responseText, provider: provider || 'local_llama', model: model || 'llama3.2:3b' });
+  } catch (error: any) {
+    console.error("AI Error:", error);
+    res.status(500).json({ error: error?.message || "Internal server error" });
+  }
+});
+
+// REAL WhatsApp Baileys Endpoints
+app.get("/api/whatsapp/debug", (req, res) => { res.json({ success: true }); });
+app.get("/api/debug/flows", (req, res) => { res.json({ count: 1 }); });
+app.get("/api/whatsapp/status", (req, res) => {
+  const state = getWhatsAppSessionState(); console.log("STATE BEFORE JSON:", JSON.stringify(state));
+  res.json({ ...state});
+});
+
+app.get("/api/whatsapp/messages", (req, res) => {
+  res.json({ messages: getWhatsAppMessages() });
+});
+
+app.post("/api/whatsapp/start", async (req, res) => {
+  try {
+    initWhatsAppBaileys(handleAutoResponse);
+    res.json({ success: true, message: "Handshake Baileys iniciado. Verifique o QR Code em instantes." });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Erro ao iniciar sessão Baileys" });
+  }
+});
+
+app.post("/api/whatsapp/disconnect", async (req, res) => {
+  try {
+    await disconnectWhatsAppBaileys();
+    res.json({ success: true, message: "Sessão encerrada com sucesso." });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Erro ao desconectar" });
+  }
+});
+
+app.post("/api/whatsapp/send", async (req, res) => {
+  const { to, text, name, attachment } = req.body;
+  if (!to || (!text && !attachment)) {
+    return res.status(400).json({ error: "Parâmetros obrigatórios ausentes." });
+  }
+  const success = await sendWhatsAppMessage(to, text || '', name, attachment);
+  res.json({ success });
+});
+
+// Flow synchronization & execution endpoints
+app.get("/api/flows", (req, res) => {
+  res.json(getServerFlows());
+});
+
+app.post("/api/flows", (req, res) => {
+  const { flows, activeFlowId, documents } = req.body;
+  setServerFlows(flows, activeFlowId, documents);
+  res.json({ success: true, message: "Fluxos e Base de Conhecimento RAG atualizados no servidor." });
+});
+
+app.post("/api/knowledge/parse-document", async (req, res) => {
+  try {
+    const { base64, filename, mimetype } = req.body;
+    if (!base64 || !filename) {
+      return res.status(400).json({ error: "base64 e filename são obrigatórios." });
+    }
+
+    const buffer = Buffer.from(base64, 'base64');
+    const result = await parseDocumentBuffer(buffer, filename, mimetype);
+
+    res.json({
+      success: true,
+      filename,
+      ...result
+    });
+  } catch (err: any) {
+    console.error("Erro ao processar arquivo para RAG:", err);
+    res.status(500).json({ error: err?.message || "Falha ao extrair texto do documento." });
+  }
+});
+
+app.post("/api/whatsapp/toggle-bot", (req, res) => {
+  const { phone, isPaused } = req.body;
+  if (!phone) return res.status(400).json({ error: "Telefone do contato é obrigatório." });
+  const paused = toggleSessionPause(phone, isPaused);
+  res.json({ success: true, isPaused: paused });
+});
+
+// ==========================================
+// USUÁRIOS E AUTENTICAÇÃO (TABELA 'users' NO SUPABASE)
+// ==========================================
+app.get("/api/users", async (req, res) => {
+  try {
+    const allUsers = await usersDB.getAll();
+    const sanitized = allUsers.map(u => ({
+      id: u.id,
+      name: u.name || u.email.split('@')[0],
+      username: u.name || u.email.split('@')[0],
+      email: u.email,
+      role: u.role || 'community',
+      status: u.status || 'active',
+      createdAt: u.createdAt || new Date().toISOString()
+    }));
+    res.json(sanitized);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "E-mail e senha são obrigatórios." });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanPwd = password.trim();
+
+    const allUsers = await usersDB.getAll();
+    let user = allUsers.find(u => u.email.toLowerCase().trim() === cleanEmail);
+
+    // Se for o e-mail master do admin e ainda não existir na tabela, cria automaticamente
+    if (!user && (cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com')) {
+      user = {
+        id: `u_admin_${Date.now()}`,
+        name: 'Administrador',
+        email: cleanEmail,
+        password: cleanPwd,
+        role: 'admin',
+        status: 'active',
+        createdAt: new Date().toISOString()
+      };
+      await usersDB.upsert(user);
+    }
+
+    if (!user) {
+      return res.status(401).json({ error: "Usuário não encontrado. Verifique seu e-mail ou crie uma conta." });
+    }
+
+    if (user.password && user.password !== cleanPwd) {
+      return res.status(401).json({ error: "Senha incorreta." });
+    }
+
+    if (user.status === 'blocked') {
+      return res.status(403).json({ error: "Sua conta está bloqueada pelo administrador." });
+    }
+
+    const effectiveRole = (cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com') 
+      ? 'admin' 
+      : (user.role || 'community');
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name || user.email.split('@')[0],
+        email: user.email,
+        role: effectiveRole,
+        status: user.status
+      }
+    });
+  } catch (err: any) {
+    console.error("[Login Error]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "E-mail e senha são obrigatórios." });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const allUsers = await usersDB.getAll();
+    const existing = allUsers.find(u => u.email.toLowerCase().trim() === cleanEmail);
+    if (existing) {
+      return res.status(400).json({ error: "Este e-mail já está cadastrado no sistema." });
+    }
+
+    const initialRole = (cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com') 
+      ? 'admin' 
+      : 'community';
+
+    const newUser: DBUser = {
+      id: `u_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name: name?.trim() || cleanEmail.split('@')[0],
+      email: cleanEmail,
+      password: password.trim(),
+      role: initialRole,
+      status: 'active',
+      createdAt: new Date().toISOString()
+    };
+
+    await usersDB.upsert(newUser);
+
+    res.json({
+      success: true,
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        status: newUser.status
+      }
+    });
+  } catch (err: any) {
+    console.error("[Register Error]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/users/update", async (req, res) => {
+  try {
+    const { id, role, status, name } = req.body;
+    if (!id) return res.status(400).json({ error: "ID do usuário é obrigatório." });
+
+    const user = await usersDB.getById(id);
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
+
+    if (role) user.role = role;
+    if (status) user.status = status;
+    if (name) user.name = name;
+
+    await usersDB.upsert(user);
+    res.json({ success: true, user });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// CHECKOUT & WEBHOOK MERCADO PAGO / PIX
+// ==========================================
+app.post("/api/checkout/mercadopago", async (req, res) => {
+  const { email } = req.body;
+  const mpToken = process.env.MP_ACCESS_TOKEN;
+  
+  if (!mpToken) {
+    return res.status(500).json({ error: "Mercado Pago não configurado. Adicione MP_ACCESS_TOKEN no .env." });
+  }
+
+  try {
+    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${mpToken}`
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            title: "Plano Enterprise - BotFlow Studio",
+            quantity: 1,
+            unit_price: 97.00,
+            currency_id: "BRL"
+          }
+        ],
+        external_reference: email,
+        payment_methods: {
+          excluded_payment_types: [
+            { id: "ticket" }
+          ],
+          installments: 12
+        },
+        back_urls: {
+          success: process.env.APP_URL || "http://localhost:3000",
+          failure: process.env.APP_URL || "http://localhost:3000",
+          pending: process.env.APP_URL || "http://localhost:3000"
+        },
+        auto_return: "approved"
+      })
+    });
+    
+    const data = await response.json();
+    res.json({ init_point: data.init_point });
+  } catch (err: any) {
+    console.error("Erro MP Checkout:", err);
+    res.status(500).json({ error: "Erro ao gerar checkout do Mercado Pago." });
+  }
+});
+
+app.post("/api/webhooks/mercadopago", async (req, res) => {
+  res.status(200).send("OK");
+  const { type, data } = req.body;
+  
+  if (type === "payment" && data && data.id) {
+    try {
+      const mpToken = process.env.MP_ACCESS_TOKEN;
+      const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${data.id}`, {
+        headers: { Authorization: `Bearer ${mpToken}` }
+      });
+      const payment = await payRes.json();
+
+      if (payment.status === "approved") {
+        const email = payment.external_reference;
+        if (email) {
+          console.log(`[Mercado Pago] Pagamento aprovado para: ${email}`);
+          const user = await usersDB.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
+          if (user) {
+            user.role = 'enterprise';
+            await usersDB.upsert(user);
+            console.log(`[Mercado Pago] ${email} promovido para Enterprise na tabela users!`);
+          }
+        }
+      }
+    } catch(err) {
+      console.error("Erro no processamento do Webhook MP:", err);
+    }
+  }
+});
+
+export async function startServer(initialPort: number = PORT): Promise<number> {
+  let currentPort = initialPort;
+  const maxAttempts = 10;
+  let boundPort = -1;
+
+  // 1. First, bind the port so wait-on/Electron can detect it immediately
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      boundPort = await new Promise<number>((resolve, reject) => {
+        const server = app.listen(currentPort, "0.0.0.0");
+        
+        server.once("listening", () => {
+          console.log(`[BotFlow Server] Successfully running on http://127.0.0.1:${currentPort}`);
+          resolve(currentPort);
+        });
+
+        server.once("error", (err: any) => {
+          if (err.code === "EADDRINUSE") {
+            console.warn(`[BotFlow Server] Port ${currentPort} is in use, trying port ${currentPort + 1}...`);
+            currentPort++;
+            resolve(-1);
+          } else {
+            console.error(`[BotFlow Server] Error listening on port ${currentPort}:`, err);
+            reject(err);
+          }
+        });
+      });
+
+      if (boundPort > 0) {
+        break;
+      }
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  if (boundPort === -1) {
+    throw new Error(`[BotFlow Server] Unable to find an available port starting from ${initialPort} to ${currentPort}`);
+  }
+
+  // 2. Then set up Vite or Static files
+  const isDev = process.env.NODE_ENV !== "production";
+
+  if (isDev) {
+    let viteReady = false;
+    let viteMiddleware: any = null;
+    
+    // Add a middleware to hold requests until Vite is ready
+    app.use(async (req, res, next) => {
+      if (viteReady && viteMiddleware) {
+        return viteMiddleware(req, res, next);
+      }
+      
+      // Wait for Vite to be ready
+      const checkInterval = setInterval(() => {
+        if (viteReady && viteMiddleware) {
+          clearInterval(checkInterval);
+          return viteMiddleware(req, res, next);
+        }
+      }, 100);
+    });
+
+    (async () => {
+      try {
+        const vitePkgName = "vite";
+        const { createServer: createViteServer } = await import(vitePkgName);
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: "spa",
+        });
+        viteMiddleware = vite.middlewares;
+        viteReady = true;
+        console.log("[BotFlow Server] Vite development middleware attached.");
+      } catch (err) {
+        console.warn("[BotFlow Server] Could not load Vite dev middleware:", err);
+      }
+    })();
+  } else {
+    // Determine static assets location dynamically (works in standard Node, ASAR, or packaged Electron)
+    const resolveDistPath = (): string => {
+      if (process.env.DIST_PATH && fs.existsSync(path.join(process.env.DIST_PATH, "index.html"))) {
+        return process.env.DIST_PATH;
+      }
+
+      const candidates = [
+        process.env.DIST_PATH,
+        currentDirname,
+        currentDirname.replace("app.asar.unpacked", "app.asar"),
+        currentDirname.replace("app.asar", "app.asar.unpacked"),
+        path.join(currentDirname, "dist"),
+        path.join(currentDirname, "../dist"),
+        path.join(currentDirname.replace("app.asar.unpacked", "app.asar"), "dist"),
+        path.join(currentDirname.replace("app.asar", "app.asar.unpacked"), "dist"),
+        path.join(process.cwd(), "dist"),
+        path.join(process.cwd(), "resources/app.asar/dist"),
+        path.join(process.cwd(), "resources/app.asar.unpacked/dist"),
+        process.cwd(),
+      ].filter(Boolean) as string[];
+
+      for (const candidate of candidates) {
+        try {
+          if (candidate && fs.existsSync(path.join(candidate, "index.html"))) {
+            return candidate;
+          }
+        } catch (e) {}
+      }
+
+      return currentDirname;
+    };
+
+    const distPath = resolveDistPath();
+
+    console.log(`[BotFlow Server] Serving static production files from: ${distPath}`);
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      const indexPath = path.join(distPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        // Ultimate fallback search if distPath changed or was not found initially
+        const fallbackPath = resolveDistPath();
+        const fallbackIndex = path.join(fallbackPath, "index.html");
+        if (fs.existsSync(fallbackIndex)) {
+          res.sendFile(fallbackIndex);
+        } else {
+          res.status(404).send(`BotFlow Studio: index.html not found. (Checked: ${indexPath})`);
+        }
+      }
+    });
+  }
+
+  return boundPort;
+}
+
+// Auto-start server if not executed inside Electron main process
+if (!process.versions?.electron) {
+  startServer().catch((err) => {
+    console.error("[BotFlow Server] Standalone auto-start failed:", err);
+  });
+}
+
