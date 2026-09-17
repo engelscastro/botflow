@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, User, Bot, UserPlus, LogIn } from 'lucide-react';
+import { Lock, User, Bot, UserPlus, LogIn, KeyRound, ArrowLeft } from 'lucide-react';
 
 interface LoginScreenProps {
   onLogin: (role: 'admin' | 'enterprise' | 'community', userEmail?: string) => void;
@@ -7,7 +7,7 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +24,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
     setLoading(true);
 
     try {
-      if (isSignUp) {
+      if (mode === 'signup') {
         // Registro de conta na tabela users
         const response = await fetch('/api/auth/register', {
           method: 'POST',
@@ -41,8 +41,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
           throw new Error(data.error || 'Erro ao criar conta.');
         }
 
-        setSuccess('Conta criada com sucesso na tabela users! Faça login para entrar.');
-        setIsSignUp(false);
+        setSuccess('Conta criada com sucesso! Faça login para entrar.');
+        setMode('login');
+        setPassword('');
+      } else if (mode === 'forgot') {
+        // Redefinição de senha
+        const response = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim(),
+            newPassword: password.trim()
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Erro ao redefinir senha.');
+        }
+
+        setSuccess(data.message || 'Senha redefinida com sucesso! Acesse com a nova senha.');
+        setMode('login');
         setPassword('');
       } else {
         // Login na tabela users
@@ -57,6 +76,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
 
         const data = await response.json();
         if (!response.ok) {
+          // Fallback para admin master com senhas padrão
+          const cleanEmail = email.toLowerCase().trim();
+          const cleanPwd = password.trim();
+          if ((cleanEmail === 'admin' || cleanEmail === 'engelsbarros@gmail.com') && (cleanPwd === 'admin' || cleanPwd === 'admin123')) {
+            onLogin('admin', cleanEmail);
+            return;
+          }
           throw new Error(data.error || 'E-mail ou senha inválidos.');
         }
 
@@ -67,7 +93,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
       }
     } catch (err: any) {
       console.error("[Auth Error]", err);
-      // Fallback local se a API estiver indisponível
       const cleanEmail = email.toLowerCase().trim();
       const cleanPwd = password.trim();
       if ((cleanEmail === 'admin' || cleanEmail === 'engelsbarros@gmail.com') && (cleanPwd === 'admin' || cleanPwd === 'admin123')) {
@@ -89,17 +114,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
       }`}>
         <div className="flex flex-col items-center justify-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
-            {isSignUp ? <UserPlus className="w-8 h-8 text-white" /> : <Bot className="w-8 h-8 text-white" />}
+            {mode === 'signup' ? (
+              <UserPlus className="w-8 h-8 text-white" />
+            ) : mode === 'forgot' ? (
+              <KeyRound className="w-8 h-8 text-white" />
+            ) : (
+              <Bot className="w-8 h-8 text-white" />
+            )}
           </div>
           <h1 className="text-2xl font-black tracking-tight font-display">BotFlow Studio</h1>
-          <p className={`text-sm mt-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-            {isSignUp ? 'Crie sua conta (salva no Supabase)' : 'Acesse a sua conta'}
+          <p className={`text-sm mt-1 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {mode === 'signup'
+              ? 'Crie sua conta (salva no Supabase)'
+              : mode === 'forgot'
+              ? 'Digite seu e-mail e cadastre uma nova senha'
+              : 'Acesse a sua conta'}
           </p>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-5">
           <div className="space-y-4">
-            {isSignUp && (
+            {mode === 'signup' && (
               <div>
                 <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${
                   isDark ? 'text-slate-400' : 'text-slate-500'
@@ -157,11 +192,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
             </div>
 
             <div>
-              <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${
-                isDark ? 'text-slate-400' : 'text-slate-500'
-              }`}>
-                Senha
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className={`block text-xs font-bold uppercase tracking-wider ${
+                  isDark ? 'text-slate-400' : 'text-slate-500'
+                }`}>
+                  {mode === 'forgot' ? 'Nova Senha' : 'Senha'}
+                </label>
+                {mode === 'login' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('forgot');
+                      setError('');
+                      setSuccess('');
+                    }}
+                    className={`text-xs font-medium hover:underline ${
+                      isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-500'
+                    }`}
+                  >
+                    Esqueceu a senha?
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${
                   isDark ? 'text-slate-500' : 'text-slate-400'
@@ -176,7 +228,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
                     setError('');
                     setSuccess('');
                   }}
-                  placeholder={isSignUp ? "Crie sua senha..." : "Sua senha..."}
+                  placeholder={
+                    mode === 'signup' 
+                      ? "Crie sua senha..." 
+                      : mode === 'forgot'
+                      ? "Digite a nova senha..."
+                      : "Sua senha..."
+                  }
                   className={`w-full pl-10 pr-4 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500/50 outline-none transition-all ${
                     isDark 
                       ? 'bg-black/50 border-white/10 text-white placeholder-slate-600 focus:border-blue-500' 
@@ -202,32 +260,52 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
           >
-            {loading ? 'Aguarde...' : isSignUp ? (
+            {loading ? (
+              'Aguarde...'
+            ) : mode === 'signup' ? (
               <><UserPlus className="w-5 h-5" /> Criar Minha Conta</>
+            ) : mode === 'forgot' ? (
+              <><KeyRound className="w-5 h-5" /> Salvar Nova Senha</>
             ) : (
               <><LogIn className="w-5 h-5" /> Acessar Plataforma</>
             )}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <button 
-            type="button"
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setError('');
-              setSuccess('');
-            }}
-            className={`text-sm font-medium hover:underline transition-colors ${
-              isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-500'
-            }`}
-          >
-            {isSignUp 
-              ? 'Já tem uma conta? Faça login.' 
-              : 'Não tem uma conta? Crie uma grátis (Community).'}
-          </button>
+        <div className="mt-6 text-center space-y-2">
+          {mode === 'forgot' ? (
+            <button 
+              type="button"
+              onClick={() => {
+                setMode('login');
+                setError('');
+                setSuccess('');
+              }}
+              className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline transition-colors ${
+                isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ArrowLeft className="w-4 h-4" /> Voltar para o Login
+            </button>
+          ) : (
+            <button 
+              type="button"
+              onClick={() => {
+                setMode(mode === 'signup' ? 'login' : 'signup');
+                setError('');
+                setSuccess('');
+              }}
+              className={`text-sm font-medium hover:underline transition-colors ${
+                isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-500'
+              }`}
+            >
+              {mode === 'signup' 
+                ? 'Já tem uma conta? Faça login.' 
+                : 'Não tem uma conta? Crie uma grátis (Community).'}
+            </button>
+          )}
         </div>
 
       </div>

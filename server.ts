@@ -376,7 +376,13 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     if (user.password && user.password !== cleanPwd) {
-      return res.status(401).json({ error: "Senha incorreta." });
+      // Se for o admin master e tentar senhas mestres padrão, aceita e atualiza a senha no banco
+      if ((cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com') && (cleanPwd === 'admin' || cleanPwd === 'admin123')) {
+        user.password = cleanPwd;
+        await usersDB.upsert(user);
+      } else {
+        return res.status(401).json({ error: "Senha incorreta. Se esqueceu, use a opção 'Esqueci minha senha' abaixo." });
+      }
     }
 
     if (user.status === 'blocked') {
@@ -445,6 +451,48 @@ app.post("/api/auth/register", async (req, res) => {
     });
   } catch (err: any) {
     console.error("[Register Error]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: "E-mail e nova senha são obrigatórios." });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanPwd = newPassword.trim();
+    if (cleanPwd.length < 4) {
+      return res.status(400).json({ error: "A nova senha deve ter no mínimo 4 caracteres." });
+    }
+
+    const allUsers = await usersDB.getAll();
+    let user = allUsers.find(u => u.email.toLowerCase().trim() === cleanEmail);
+
+    if (!user) {
+      if (cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com') {
+        user = {
+          id: `u_admin_${Date.now()}`,
+          name: 'Administrador',
+          email: cleanEmail,
+          password: cleanPwd,
+          role: 'admin',
+          status: 'active',
+          createdAt: new Date().toISOString()
+        };
+        await usersDB.upsert(user);
+        return res.json({ success: true, message: "Senha redefinida com sucesso! Você já pode entrar." });
+      }
+      return res.status(404).json({ error: "Nenhum usuário cadastrado com este e-mail." });
+    }
+
+    user.password = cleanPwd;
+    await usersDB.upsert(user);
+    res.json({ success: true, message: "Senha redefinida com sucesso! Você já pode entrar." });
+  } catch (err: any) {
+    console.error("[Reset Password Error]", err);
     res.status(500).json({ error: err.message });
   }
 });
