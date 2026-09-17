@@ -50,24 +50,25 @@ export default function App() {
   });
 
   const [currentUserEmail, setCurrentUserEmail] = useState<string>(() => {
-    return localStorage.getItem('botflow_user_email') || 'engelsbarros@gmail.com';
+    return localStorage.getItem('botflow_user_email') || '';
   });
 
   const [userRole, setUserRole] = useState<'admin' | 'enterprise' | 'community' | null>(() => {
     const email = localStorage.getItem('botflow_user_email');
-    if (email === 'engelsbarros@gmail.com' || email === 'admin@maternidade.com') {
-      return 'admin';
-    }
     const saved = localStorage.getItem('botflow_role') as 'admin' | 'enterprise' | 'community' | null;
-    return saved || 'admin';
+    if (saved && email) {
+      if (email === 'engelsbarros@gmail.com' || email === 'admin@maternidade.com') {
+        return 'admin';
+      }
+      return saved;
+    }
+    return null;
   });
 
   const [systemUsers, setSystemUsers] = useState<UserAccount[]>(() => {
     const saved = localStorage.getItem('botflow_users');
     if (saved) return JSON.parse(saved);
-    return [
-      { id: '1', username: 'admin', email: 'engelsbarros@gmail.com', role: 'admin', status: 'active', createdAt: new Date().toLocaleDateString() },
-    ];
+    return [];
   });
 
   const loadUsers = async () => {
@@ -80,15 +81,17 @@ export default function App() {
           localStorage.setItem('botflow_users', JSON.stringify(data));
 
           // Sincroniza o cargo (role) do usuário logado diretamente com o banco de dados
-          const emailToCheck = localStorage.getItem('botflow_user_email') || currentUserEmail || 'engelsbarros@gmail.com';
-          const matchedUser = data.find((u: any) => u.email?.toLowerCase().trim() === emailToCheck.toLowerCase().trim());
+          const emailToCheck = localStorage.getItem('botflow_user_email') || currentUserEmail;
+          if (emailToCheck) {
+            const matchedUser = data.find((u: any) => u.email?.toLowerCase().trim() === emailToCheck.toLowerCase().trim());
 
-          if (matchedUser) {
-            setUserRole(matchedUser.role);
-            localStorage.setItem('botflow_role', matchedUser.role);
-          } else if (emailToCheck === 'engelsbarros@gmail.com' || emailToCheck === 'admin@maternidade.com') {
-            setUserRole('admin');
-            localStorage.setItem('botflow_role', 'admin');
+            if (matchedUser) {
+              setUserRole(matchedUser.role);
+              localStorage.setItem('botflow_role', matchedUser.role);
+            } else if (emailToCheck === 'engelsbarros@gmail.com' || emailToCheck === 'admin@maternidade.com') {
+              setUserRole('admin');
+              localStorage.setItem('botflow_role', 'admin');
+            }
           }
         }
       }
@@ -136,7 +139,7 @@ export default function App() {
   };
 
   const handleLogin = (role: 'admin' | 'enterprise' | 'community', email?: string) => {
-    const userEmail = email || 'engelsbarros@gmail.com';
+    const userEmail = email || '';
     const effectiveRole = (userEmail === 'engelsbarros@gmail.com' || userEmail === 'admin@maternidade.com') ? 'admin' : role;
     setUserRole(effectiveRole);
     setCurrentUserEmail(userEmail);
@@ -542,7 +545,7 @@ export default function App() {
   };
 
   if (!userRole) {
-    return <LoginScreen onLogin={handleLogin} theme={theme} users={systemUsers} />;
+    return <LoginScreen onLogin={handleLogin} theme={theme} />;
   }
 
   return (
