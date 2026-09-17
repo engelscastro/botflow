@@ -34,8 +34,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme }) => {
         }
       });
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (session) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (session && event !== 'SIGNED_OUT') {
           onLogin(getUserRole(session.user), session.user.email);
         }
       });

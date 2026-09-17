@@ -494,6 +494,14 @@ export default function App() {
         onLogout={() => {
           setUserRole(null);
           localStorage.removeItem('botflow_role');
+          import('@supabase/supabase-js').then(({ createClient }) => {
+            const url = import.meta.env.VITE_SUPABASE_URL;
+            const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+            if(url && key) {
+              const supabase = createClient(url, key);
+              supabase.auth.signOut();
+            }
+          });
         }}
       />
 
