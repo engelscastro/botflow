@@ -210,6 +210,8 @@ export interface BroadcastCampaign {
 export interface UserAccount {
   id: string;
   username: string;
+  name?: string;
+  email?: string;
   role: 'admin' | 'enterprise' | 'community';
   status: 'active' | 'inactive' | 'blocked';
   lastLogin?: string;

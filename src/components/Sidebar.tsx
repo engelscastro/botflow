@@ -1,5 +1,5 @@
 import React from 'react';
-import { 
+import {  
   Layers, 
   MessageSquare, 
   Wifi, 
@@ -12,7 +12,7 @@ import {
   Users,
   Calendar,
   ShieldCheck
-} from 'lucide-react';
+, Zap } from 'lucide-react';
 
 interface SidebarProps {
   activeSection: string;

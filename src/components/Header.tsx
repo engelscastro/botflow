@@ -26,6 +26,7 @@ interface HeaderProps {
   onToggleTheme: () => void;
   onOpenLogs?: () => void;
   userRole?: 'admin' | 'enterprise' | 'community' | null;
+  userEmail?: string;
   onLogout?: () => void;
 }
 
@@ -38,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   onOpenLogs,
   userRole,
+  userEmail,
   onLogout
 }) => {
   const connectedChannelsCount = channels.filter(c => c.connected).length;
@@ -168,6 +170,14 @@ export const Header: React.FC<HeaderProps> = ({
           <Play className="w-3.5 h-3.5 fill-current" /> Simular Chat ao Vivo
         </button>
 
+        {userEmail && (
+          <div className="hidden md:flex items-center gap-2 pl-2 border-l border-white/10">
+            <span className={`text-[11px] font-medium font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              {userEmail}
+            </span>
+          </div>
+        )}
+
         {onLogout && (
           <button
             onClick={onLogout}
@@ -176,6 +186,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/20'
                 : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-200'
             }`}
+            title="Encerrar sessão"
           >
             Sair
           </button>

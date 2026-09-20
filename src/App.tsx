@@ -49,32 +49,103 @@ export default function App() {
     return (localStorage.getItem('botflow_theme') as 'dark' | 'light') || 'dark';
   });
 
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>(() => {
+    return localStorage.getItem('botflow_user_email') || '';
+  });
+
   const [userRole, setUserRole] = useState<'admin' | 'enterprise' | 'community' | null>(() => {
-    return (localStorage.getItem('botflow_role') as 'admin' | 'enterprise' | 'community' | null) || null;
+    const email = localStorage.getItem('botflow_user_email');
+    const saved = localStorage.getItem('botflow_role') as 'admin' | 'enterprise' | 'community' | null;
+    if (saved && email) {
+      if (email === 'engelsbarros@gmail.com' || email === 'admin@maternidade.com') {
+        return 'admin';
+      }
+      return saved;
+    }
+    return null;
   });
 
   const [systemUsers, setSystemUsers] = useState<UserAccount[]>(() => {
     const saved = localStorage.getItem('botflow_users');
     if (saved) return JSON.parse(saved);
-    return [
-      { id: '1', username: 'admin', role: 'admin', status: 'active', createdAt: new Date().toLocaleDateString() },
-      { id: '2', username: 'enterprise', role: 'enterprise', status: 'active', createdAt: new Date().toLocaleDateString() },
-      { id: '3', username: 'community', role: 'community', status: 'active', createdAt: new Date().toLocaleDateString() }
-    ];
+    return [];
   });
 
-  const handleUpdateUserStatus = (userId: string, status: 'active' | 'inactive' | 'blocked') => {
+  const loadUsers = async () => {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setSystemUsers(data);
+          localStorage.setItem('botflow_users', JSON.stringify(data));
+
+          // Sincroniza o cargo (role) do usuário logado diretamente com o banco de dados
+          const emailToCheck = localStorage.getItem('botflow_user_email') || currentUserEmail;
+          if (emailToCheck) {
+            const matchedUser = data.find((u: any) => u.email?.toLowerCase().trim() === emailToCheck.toLowerCase().trim());
+
+            if (matchedUser) {
+              setUserRole(matchedUser.role);
+              localStorage.setItem('botflow_role', matchedUser.role);
+            } else if (emailToCheck === 'engelsbarros@gmail.com' || emailToCheck === 'admin@maternidade.com') {
+              setUserRole('admin');
+              localStorage.setItem('botflow_role', 'admin');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch users:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const handleUpdateUserStatus = async (userId: string, status: 'active' | 'inactive' | 'blocked') => {
     setSystemUsers(prev => {
       const newUsers = prev.map(u => u.id === userId ? { ...u, status } : u);
       localStorage.setItem('botflow_users', JSON.stringify(newUsers));
       return newUsers;
     });
+    try {
+      await fetch('/api/users/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, status })
+      });
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleLogin = (role: 'admin' | 'enterprise' | 'community') => {
-    setUserRole(role);
-    localStorage.setItem('botflow_role', role);
-    if (role === 'community') {
+  const handleUpdateUserRole = async (userId: string, role: 'admin' | 'enterprise' | 'community') => {
+    setSystemUsers(prev => {
+      const newUsers = prev.map(u => u.id === userId ? { ...u, role } : u);
+      localStorage.setItem('botflow_users', JSON.stringify(newUsers));
+      return newUsers;
+    });
+    try {
+      await fetch('/api/users/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, role })
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleLogin = (role: 'admin' | 'enterprise' | 'community', email?: string) => {
+    const userEmail = email || '';
+    const effectiveRole = (userEmail === 'engelsbarros@gmail.com' || userEmail === 'admin@maternidade.com') ? 'admin' : role;
+    setUserRole(effectiveRole);
+    setCurrentUserEmail(userEmail);
+    localStorage.setItem('botflow_role', effectiveRole);
+    localStorage.setItem('botflow_user_email', userEmail);
+    if (effectiveRole === 'community') {
       const allowed = ['builder', 'inbox', 'knowledge', 'channels', 'ai', 'schedule', 'analytics'];
       if (!allowed.includes(activeSection)) {
         setActiveSection('builder');
@@ -474,7 +545,7 @@ export default function App() {
   };
 
   if (!userRole) {
-    return <LoginScreen onLogin={handleLogin} theme={theme} users={systemUsers} />;
+    return <LoginScreen onLogin={handleLogin} theme={theme} />;
   }
 
   return (
@@ -491,9 +562,12 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         onOpenLogs={() => setIsLogsOpen(true)}
         userRole={userRole}
+        userEmail={currentUserEmail}
         onLogout={() => {
           setUserRole(null);
+          setCurrentUserEmail('');
           localStorage.removeItem('botflow_role');
+          localStorage.removeItem('botflow_user_email');
           import('@supabase/supabase-js').then(({ createClient }) => {
             const url = import.meta.env.VITE_SUPABASE_URL;
             const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -598,6 +672,8 @@ export default function App() {
               isDark={theme === 'dark'}
               users={systemUsers}
               onUpdateStatus={handleUpdateUserStatus}
+              onUpdateRole={handleUpdateUserRole}
+              onRefresh={loadUsers}
             />
           </div>
         </main>

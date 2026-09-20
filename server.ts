@@ -56,7 +56,7 @@ async function handleAutoResponse(fromNumber: string, userPrompt: string): Promi
 }
 
 // Health check endpoint
-import { contactsDB, appointmentsDB } from './server/db.js';
+import { contactsDB, appointmentsDB, usersDB, DBUser } from './server/db.js';
 
 app.get("/api/contacts", async (req, res) => {
   res.json(await contactsDB.getAll());
@@ -321,6 +321,248 @@ app.post("/api/whatsapp/toggle-bot", (req, res) => {
   if (!phone) return res.status(400).json({ error: "Telefone do contato é obrigatório." });
   const paused = toggleSessionPause(phone, isPaused);
   res.json({ success: true, isPaused: paused });
+});
+
+// ==========================================
+// USUÁRIOS E AUTENTICAÇÃO (TABELA 'users' NO SUPABASE)
+// ==========================================
+app.get("/api/users", async (req, res) => {
+  try {
+    const allUsers = await usersDB.getAll();
+    const sanitized = allUsers.map(u => ({
+      id: u.id,
+      name: u.name || u.email.split('@')[0],
+      username: u.name || u.email.split('@')[0],
+      email: u.email,
+      role: u.role || 'community',
+      status: u.status || 'active',
+      createdAt: u.createdAt || new Date().toISOString()
+    }));
+    res.json(sanitized);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "E-mail e senha são obrigatórios." });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanPwd = password.trim();
+
+    const allUsers = await usersDB.getAll();
+    let user = allUsers.find(u => u.email.toLowerCase().trim() === cleanEmail);
+
+    if (!user) {
+      return res.status(401).json({ error: "Usuário não encontrado. Verifique seu e-mail ou crie uma conta." });
+    }
+
+    if (user.password && user.password !== cleanPwd) {
+      return res.status(401).json({ error: "Senha incorreta. Se esqueceu, use a opção 'Esqueci minha senha' abaixo." });
+    }
+
+    if (user.status === 'blocked') {
+      return res.status(403).json({ error: "Sua conta está bloqueada pelo administrador." });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name || user.email.split('@')[0],
+        email: user.email,
+        role: user.role || 'community',
+        status: user.status
+      }
+    });
+  } catch (err: any) {
+    console.error("[Login Error]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "E-mail e senha são obrigatórios." });
+    }
+    
+    // Validação básica de e-mail (tem que ter @ e ponto)
+    if (!email.includes('@') || !email.includes('.')) {
+      return res.status(400).json({ error: "Por favor, informe um e-mail válido (exemplo@email.com)." });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const allUsers = await usersDB.getAll();
+    const existing = allUsers.find(u => u.email.toLowerCase().trim() === cleanEmail);
+    if (existing) {
+      return res.status(400).json({ error: "Este e-mail já está cadastrado no sistema." });
+    }
+
+    const initialRole = (cleanEmail === 'engelsbarros@gmail.com' || cleanEmail === 'admin@maternidade.com') 
+      ? 'admin' 
+      : 'community';
+
+    const newUser: DBUser = {
+      id: `u_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name: name?.trim() || cleanEmail.split('@')[0],
+      email: cleanEmail,
+      password: password.trim(),
+      role: initialRole,
+      status: 'active',
+      createdAt: new Date().toISOString()
+    };
+
+    await usersDB.upsert(newUser);
+
+    res.json({
+      success: true,
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        status: newUser.status
+      }
+    });
+  } catch (err: any) {
+    console.error("[Register Error]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: "E-mail e nova senha são obrigatórios." });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanPwd = newPassword.trim();
+    if (cleanPwd.length < 4) {
+      return res.status(400).json({ error: "A nova senha deve ter no mínimo 4 caracteres." });
+    }
+
+    const allUsers = await usersDB.getAll();
+    let user = allUsers.find(u => u.email.toLowerCase().trim() === cleanEmail);
+
+    if (!user) {
+      return res.status(404).json({ error: "Nenhum usuário cadastrado com este e-mail." });
+    }
+
+    user.password = cleanPwd;
+    await usersDB.upsert(user);
+    res.json({ success: true, message: "Senha redefinida com sucesso! Você já pode entrar." });
+  } catch (err: any) {
+    console.error("[Reset Password Error]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/users/update", async (req, res) => {
+  try {
+    const { id, role, status, name } = req.body;
+    if (!id) return res.status(400).json({ error: "ID do usuário é obrigatório." });
+
+    const user = await usersDB.getById(id);
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
+
+    if (role) user.role = role;
+    if (status) user.status = status;
+    if (name) user.name = name;
+
+    await usersDB.upsert(user);
+    res.json({ success: true, user });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// CHECKOUT & WEBHOOK MERCADO PAGO / PIX
+// ==========================================
+app.post("/api/checkout/mercadopago", async (req, res) => {
+  const { email } = req.body;
+  const mpToken = process.env.MP_ACCESS_TOKEN;
+  
+  if (!mpToken) {
+    return res.status(500).json({ error: "Mercado Pago não configurado. Adicione MP_ACCESS_TOKEN no .env." });
+  }
+
+  try {
+    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${mpToken}`
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            title: "Plano Enterprise - BotFlow Studio",
+            quantity: 1,
+            unit_price: 97.00,
+            currency_id: "BRL"
+          }
+        ],
+        external_reference: email,
+        payment_methods: {
+          excluded_payment_types: [
+            { id: "ticket" }
+          ],
+          installments: 12
+        },
+        back_urls: {
+          success: process.env.APP_URL || "http://localhost:3000",
+          failure: process.env.APP_URL || "http://localhost:3000",
+          pending: process.env.APP_URL || "http://localhost:3000"
+        },
+        auto_return: "approved"
+      })
+    });
+    
+    const data = await response.json();
+    res.json({ init_point: data.init_point });
+  } catch (err: any) {
+    console.error("Erro MP Checkout:", err);
+    res.status(500).json({ error: "Erro ao gerar checkout do Mercado Pago." });
+  }
+});
+
+app.post("/api/webhooks/mercadopago", async (req, res) => {
+  res.status(200).send("OK");
+  const { type, data } = req.body;
+  
+  if (type === "payment" && data && data.id) {
+    try {
+      const mpToken = process.env.MP_ACCESS_TOKEN;
+      const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${data.id}`, {
+        headers: { Authorization: `Bearer ${mpToken}` }
+      });
+      const payment = await payRes.json();
+
+      if (payment.status === "approved") {
+        const email = payment.external_reference;
+        if (email) {
+          console.log(`[Mercado Pago] Pagamento aprovado para: ${email}`);
+          const user = await usersDB.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
+          if (user) {
+            user.role = 'enterprise';
+            await usersDB.upsert(user);
+            console.log(`[Mercado Pago] ${email} promovido para Enterprise na tabela users!`);
+          }
+        }
+      }
+    } catch(err) {
+      console.error("Erro no processamento do Webhook MP:", err);
+    }
+  }
 });
 
 export async function startServer(initialPort: number = PORT): Promise<number> {

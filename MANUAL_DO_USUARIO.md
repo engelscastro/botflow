@@ -18,28 +18,47 @@ O **BotFlow Studio PRO** é uma plataforma profissional de automação multicana
 
 ---
 
-## 📱 2. Como Conectar seu WhatsApp Web em Tempo Real
+## 📱 2. Como Conectar o WhatsApp ao BotFlow
 
-Siga os passos abaixo para conectar o WhatsApp do seu celular ao BotFlow Studio:
+O BotFlow Studio PRO suporta dois motores de conexão com o WhatsApp. Você pode escolher qual utilizar na tela de Conexões e Canais:
 
-### Passo 1: Acessar a Tela de Conexões
-1. No menu lateral esquerdo, clique em **Conexões & Canais**.
-2. Certifique-se de que a aba **WhatsApp Web** está selecionada.
+### Opção A: WhatsApp Cloud API (Oficial da Meta) - Recomendado para Empresas
+A API Oficial é a opção mais segura e escalável, hospedada diretamente nos servidores da Meta (Facebook). Ela é imune a bloqueios geográficos ou banimentos por uso de IPs de nuvem.
 
-### Passo 2: Gerar o QR Code Real
-1. Clique no botão verde **"⚡ Iniciar & Gerar QR Code Real"**.
-2. O servidor iniciará a conexão via socket seguro e exibirá o QR Code gerado em tempo real na tela.
+**Vantagens:**
+- Imune a banimentos por IP (ideal para servidores em nuvem).
+- Maior estabilidade (não precisa ler QR Code e não desconecta).
+- Suporte a botões interativos nativos do WhatsApp.
 
-### Passo 3: Escanear com o Aplicativo WhatsApp do Celular
-1. Abra o aplicativo **WhatsApp** no seu aparelho celular.
-2. Acesse o menu de opções:
-   - **Android:** Toque nos 3 pontinhos no canto superior direito ➔ **Aparelhos Conectados**.
-   - **iPhone:** Toque em **Configurações** no canto inferior direito ➔ **Aparelhos Conectados**.
-3. Toque no botão **Conectar um Aparelho**.
-4. Aponta a câmera do celular para o QR Code exibido na tela do computador.
-5. Aguarde 2 a 3 segundos até que o status mude para **"Sincronizado & Respostas IA Ativas"** com uma borda verde.
+**Como Configurar:**
+1. No menu lateral, clique em **Conexões & Canais**.
+2. Na aba WhatsApp, selecione a sub-aba **API Oficial (Meta Cloud)**.
+3. Crie um aplicativo no [Painel de Desenvolvedores da Meta](https://developers.facebook.com/).
+4. Copie as credenciais da Meta e cole no BotFlow:
+   - **Token de Acesso Permanente**
+   - **ID do Número de Telefone**
+   - **Token de Verificação do Webhook**
+5. Pegue a **URL do Webhook** gerada no BotFlow e configure-a lá no painel da Meta para receber as mensagens.
+6. Clique em **Salvar Configuração Oficial**.
 
-> 💡 **Dica de Segurança:** As credenciais de sessão são salvas localmente de forma criptografada na pasta `baileys_auth_info`. Para desconectar a linha a qualquer momento, basta clicar no botão vermelho **"Desconectar Linha do WhatsApp"**.
+> 💡 **Aviso:** Números configurados na API Oficial não podem mais ser usados no aplicativo comum do WhatsApp no celular. Todo o atendimento manual deve ser feito via painel do BotFlow (Inbox).
+
+---
+
+### Opção B: QR Code Emulado (Baileys)
+Esta opção simula um WhatsApp Web conectando o seu aparelho físico ao servidor.
+
+**Vantagens:**
+- Você pode continuar usando o WhatsApp normal no celular para responder mensagens.
+- Não há custo por mensagem iniciada.
+
+**Como Configurar:**
+1. No menu lateral, clique em **Conexões & Canais**.
+2. Na aba WhatsApp, selecione a sub-aba **QR Code (Baileys)**.
+3. Clique em **"⚡ Iniciar & Gerar QR Code Real"**.
+4. Abra o WhatsApp no seu celular, vá em **Aparelhos Conectados** e leia o QR Code gerado na tela.
+
+> ⚠️ **Atenção sobre Bloqueios (Código 401):** Se o seu servidor (como o Render) estiver hospedado no exterior (EUA) e o seu aparelho no Brasil, a Meta pode restringir preventivamente a sua conta por suspeita de hackeamento. Recomendamos hospedar o sistema no Brasil (Locaweb, Hostinger SP) ou utilizar o modo API Oficial se o seu servidor for estrangeiro.
 
 ---
 

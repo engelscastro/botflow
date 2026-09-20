@@ -66,7 +66,7 @@ class AsyncDB<T extends { id: string }> {
 
   async getAll(): Promise<T[]> {
     if (supabase) {
-      const { data, error } = await supabase.from(this.tableName).select('*').order('createdAt', { ascending: true });
+      const { data, error } = await supabase.from(this.tableName).select('*');
       if (!error && data) return data as T[];
       console.error(`Supabase error (getAll ${this.tableName}):`, error);
     }
@@ -127,3 +127,15 @@ class AsyncDB<T extends { id: string }> {
 
 export const contactsDB = new AsyncDB<DBContact>('contacts.json', 'contacts');
 export const appointmentsDB = new AsyncDB<Appointment>('appointments.json', 'appointments');
+
+export interface DBUser {
+  id: string;
+  name?: string;
+  email: string;
+  password?: string;
+  role: 'admin' | 'enterprise' | 'community';
+  status: 'active' | 'inactive' | 'blocked';
+  createdAt?: string;
+}
+
+export const usersDB = new AsyncDB<DBUser>('users.json', 'users');
